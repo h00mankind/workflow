@@ -12,7 +12,7 @@ A practical recognition guide for swapping a wall of markdown for a single self-
 Every artifact this skill produces **must** link the h00man design tokens CSS in `<head>` and use those tokens (CSS custom properties) for color, type, spacing, radius, shadow, and motion — instead of hardcoding values. This keeps every artifact visually consistent and themable.
 
 ```html
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/h00mankind/workflow@v1/h00man-variables.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/h00mankind/workflow@v2/skills/to-html/h00man-variables.css">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Geist:wght@100..900&family=Geist+Mono:wght@100..900&family=Padauk:wght@400;700&display=swap" rel="stylesheet">
@@ -85,7 +85,7 @@ Stay in markdown / prose when the answer is short, conversational, or genuinely 
 ## The non-negotiable constraints
 
 1. **One file.** Inline CSS in `<style>`, inline JS in `<script>`. No external build, no bundler, no npm install. The user can save it, double-click it, and it works.
-2. **CDN-only dependencies, sparingly.** Always link the h00man design tokens (`https://cdn.jsdelivr.net/gh/h00mankind/workflow@v1/h00man-variables.css`) plus the Geist font family. Beyond that, if a chart or interaction genuinely needs a library, load it from a CDN (e.g. `https://cdnjs.cloudflare.com`). Default to vanilla. Never reference local modules or assume a dev server.
+2. **CDN-only dependencies, sparingly.** Always link the h00man design tokens (`https://cdn.jsdelivr.net/gh/h00mankind/workflow@v2/skills/to-html/h00man-variables.css`) plus the Geist font family. Beyond that, if a chart or interaction genuinely needs a library, load it from a CDN (e.g. `https://cdnjs.cloudflare.com`). Default to vanilla. Never reference local modules or assume a dev server.
 3. **No browser storage.** `localStorage` / `sessionStorage` fail inside Claude artifacts. Keep state in JS variables or React state for the session.
 4. **Export back out.** For any editor-style artifact, include a "copy as markdown" or "download JSON" button so what the user did in the UI returns to a form they can paste into the next prompt or commit. The loop is: prompt → HTML → edit → export → next prompt.
 5. **Open directly in a browser.** No server, no build step, no fetch to localhost. Click-to-open is the floor of the user experience.
