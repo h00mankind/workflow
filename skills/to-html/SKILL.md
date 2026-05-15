@@ -143,6 +143,54 @@ Also worth doing on any narrow container (cards, sidebars, grid children):
 
 Without `min-width: 0`, flex and grid children default to their content's minimum width — a long unbroken URL forces the column wider than the layout allows.
 
+## Scrollspy that actually works — track sections, not headings
+
+If the artifact has a sidebar table of contents, the TOC should highlight whichever section the reader is currently *looking at*, not the one whose `<h2>` happens to be in some narrow band. The bug we hit before: an `IntersectionObserver` watching `<h2>` headings with a tight `rootMargin` flipped the active link to the *next* section the moment its heading peeked into the band, even though the reader was still mid-way through the previous section's body. Wrong-feeling, especially on tall sections.
+
+**Rule: wrap each `<h2>` + its content in a `<section>` element with the id, and observe the sections.** Then pick the section with the largest visible area. That's what the reader is actually reading.
+
+```html
+<section id="anatomy">
+  <h2>Anatomy</h2>
+  <!-- content -->
+</section>
+<section id="ship">
+  <h2>Ship it</h2>
+  <!-- content -->
+</section>
+```
+
+```js
+const sections = Array.from(document.querySelectorAll('main section[id]'));
+const tocLinks = Array.from(document.querySelectorAll('.toc a'));
+const linkFor = id => tocLinks.find(a => a.getAttribute('href') === '#' + id);
+
+const visibleArea = new Map();
+
+const spy = new IntersectionObserver((entries) => {
+  entries.forEach(e => {
+    visibleArea.set(e.target.id, e.isIntersecting ? e.intersectionRect.height : 0);
+  });
+  // Pick the section with the most visible area; fall back to the last one passed.
+  let activeId = null, max = 0;
+  for (const [id, area] of visibleArea) {
+    if (area > max) { max = area; activeId = id; }
+  }
+  if (!activeId) return;
+  tocLinks.forEach(a => a.classList.remove('is-active'));
+  const link = linkFor(activeId);
+  if (link) link.classList.add('is-active');
+}, {
+  // Threshold steps so the observer fires as visibility changes, not just on enter/exit.
+  threshold: [0, 0.25, 0.5, 0.75, 1]
+});
+sections.forEach(s => spy.observe(s));
+```
+
+Don't use `rootMargin: '-30% 0px -60% 0px'` on headings — that's the broken pattern. The `threshold: [0, 0.25, 0.5, 0.75, 1]` is what makes "biggest visible area wins" possible: the callback fires whenever a section's visibility crosses any of those steps, so the map stays current.
+
+If sections aren't an option (e.g. the markup is already shipped with bare `<h2>`s), the fallback is a manual scroll handler: on `scroll`, find the heading whose top is closest to but still above the viewport top. Less elegant but unambiguous.
+
 ## The 9 categories — recognize these triggers
 
 When a user request maps to one of these, default to HTML. The phrasings on the right are what they tend to *actually say*, not what the pattern is called.
