@@ -46,6 +46,51 @@ Dark theme opt-in is a single attribute on `<html>`:
 <html data-theme="dark">
 ```
 
+## Always include a theme switcher button
+
+Every artifact this skill produces **must** include a theme switcher button so the reader can flip between light and dark. Place it in a fixed top-right corner so it's reachable from anywhere on the page without interfering with content. No browser storage — toggle the `data-theme` attribute on `<html>` directly. Default to whichever theme suits the artifact; the button lets the reader override.
+
+```html
+<button id="theme-toggle" type="button" aria-label="Toggle theme" title="Toggle theme">
+  <span class="theme-icon-light" aria-hidden="true">☀</span>
+  <span class="theme-icon-dark" aria-hidden="true">☾</span>
+</button>
+```
+
+```css
+#theme-toggle {
+  position: fixed;
+  top: var(--space-16);
+  right: var(--space-16);
+  z-index: var(--z-overlay);
+  width: 36px;
+  height: 36px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--bg-card);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-full);
+  box-shadow: var(--shadow-sm);
+  cursor: pointer;
+  transition: background var(--duration-base) var(--ease-out);
+}
+#theme-toggle:hover { background: var(--bg-card-hover); }
+#theme-toggle:focus-visible { outline: none; box-shadow: var(--focus-ring); }
+.theme-icon-dark { display: none; }
+[data-theme="dark"] .theme-icon-light { display: none; }
+[data-theme="dark"] .theme-icon-dark { display: inline; }
+```
+
+```js
+const root = document.documentElement;
+document.getElementById('theme-toggle').addEventListener('click', () => {
+  const next = root.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+  root.setAttribute('data-theme', next);
+});
+```
+
 The token vocabulary you have available (see the CDN file for full definitions):
 
 - **Surfaces** — `--bg`, `--bg-elev`, `--bg-card`, `--bg-card-hover`, `--bg-tinted`, `--bg-inset`
