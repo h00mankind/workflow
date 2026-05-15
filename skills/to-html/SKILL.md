@@ -90,6 +90,59 @@ Stay in markdown / prose when the answer is short, conversational, or genuinely 
 4. **Export back out.** For any editor-style artifact, include a "copy as markdown" or "download JSON" button so what the user did in the UI returns to a form they can paste into the next prompt or commit. The loop is: prompt → HTML → edit → export → next prompt.
 5. **Open directly in a browser.** No server, no build step, no fetch to localhost. Click-to-open is the floor of the user experience.
 
+## Where to save the file
+
+The artifact is a file on disk — pick the location deliberately. Follow this order:
+
+1. **If the user names a path, use it.** "Save to `docs/explainers/`" or "output to my desktop" beats every default.
+2. **Otherwise detect context.** Run `git rev-parse --show-toplevel` (or check if the cwd is inside a git repo). If yes, save to `<repo-root>/docs/artifacts/`. Create the directory if it doesn't exist. This keeps artifacts versioned alongside the code they describe.
+3. **If not in a repo, save to `~/Downloads/`.** This is the casual / one-off / "I just want to look at it" path.
+
+**Filename**: derive a kebab-case slug from the user's request, no timestamp. `sharable-skills.html`, not `artifact-20260515.html`. Predictable names are easier to find again, and the user can rename if they want versioning.
+
+**Always end the turn by reporting the absolute path and an open command**, like:
+
+```
+Saved to /Users/you/Downloads/sharable-skills.html
+Open with: open ~/Downloads/sharable-skills.html
+```
+
+Don't bury the path in prose — the user needs to click/run it.
+
+## Overflow guardrails — long strings can't break the layout
+
+Any artifact you generate will eventually contain a long URL, file path, dependency ID, or shell one-liner. Without guardrails these punch out of cards, sidebars, and table cells. **Always include both rules in your `<style>`:**
+
+```css
+/* Inline code wraps anywhere — for URLs and long identifiers in prose */
+code {
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+/* Block code scrolls horizontally — preserve formatting in pre/code */
+pre {
+  overflow-x: auto;
+  max-width: 100%;
+}
+pre code {
+  overflow-wrap: normal;
+  word-break: normal;
+  white-space: pre;
+}
+```
+
+Why this split: inline `<code>` lives inside paragraphs, sidebars, and tight columns — wrapping mid-string is uglier than overflowing, but only barely, and overflowing breaks the page. Block `<pre><code>` is supposed to preserve formatting, so it scrolls instead.
+
+Also worth doing on any narrow container (cards, sidebars, grid children):
+
+```css
+.card, .sidebar, .grid > * {
+  min-width: 0;   /* lets the child shrink below its content's intrinsic width */
+}
+```
+
+Without `min-width: 0`, flex and grid children default to their content's minimum width — a long unbroken URL forces the column wider than the layout allows.
+
 ## The 9 categories — recognize these triggers
 
 When a user request maps to one of these, default to HTML. The phrasings on the right are what they tend to *actually say*, not what the pattern is called.
