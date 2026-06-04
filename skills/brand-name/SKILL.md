@@ -126,9 +126,9 @@ Don't just dump a list. Return a shortlist — **20–30 survivors in deep mode,
 
 - a **live shortlist panel** (a sticky sidebar or header bar) that updates the instant a card is toggled, showing the current picks and a count;
 - a **Reset** button that restores the default starred set (your recommended shortlist);
-- a **Save** button that **copies the user's current shortlist to the clipboard as markdown** — name, type, why, and flag per pick — so it pastes straight back into a prompt. (Save = copy-to-clipboard, *not* persistence: `localStorage` throws in sandboxed-iframe artifacts, so keep all selection state in JS variables for the session. The user exports before closing.)
+- a **Copy** button that **copies the user's current shortlist to the clipboard as markdown** — name, type, why, and flag per pick — so it pastes straight back into a prompt. Label it "Copy", not "Save": it copies to the clipboard, it does not persist. (`localStorage` throws in sandboxed-iframe artifacts anyway, so keep all selection state in JS variables for the session; the user copies out before closing.)
 
-Keep selection state in a plain JS structure (e.g. a `Set` of candidate ids); the star buttons, the live panel, the count, Reset, and Save all read from it. No browser storage.
+Keep selection state in a plain JS structure (e.g. a `Set` of candidate ids); the star buttons, the live panel, the count, Reset, and Copy all read from it. No browser storage.
 
 **Follow the `to-html` skill** for everything else about the artifact — design tokens, theme switcher, single self-contained file, overflow guardrails, no browser storage, **and where to save it.** Don't hardcode a destination here; `to-html` decides the path and reports it. One addition: naming outputs are private working material, so if it lands in a repo, make sure that artifact directory is gitignored (add the rule if it isn't) — candidates shouldn't get published.
 
