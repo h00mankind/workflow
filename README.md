@@ -10,6 +10,7 @@ Two namespaces, by environment:
 
 - `skills/to-html/` — Produce single-file HTML artifacts instead of walls of markdown. Bundles `h00man-variables.css` (also served via CDN).
 - `skills/ui-designer/` — UI/UX design and frontend visual implementation across React, Svelte, and plain HTML.
+- `skills/brand-name/` — Generate and screen brand name candidates the way naming agencies do (taxonomy spread, sound symbolism, Abercrombie distinctiveness). Bundles `reference.md`, a deep-dive on naming theory, law, and case studies.
 
 **`chat-skills/` — for chat interfaces** (Claude.ai, ChatGPT, Gemini, etc.). Copy/paste into a system prompt or message — not installed via a CLI.
 
