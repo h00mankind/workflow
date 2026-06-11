@@ -66,7 +66,3 @@ Each finding:
 - **Suggested fix** — one line
 
 Order by severity. End with the **top 3 to fix first** and an overall verdict in 2–3 sentences — for `safety`, an explicit **go / no-go** for shipping. Then the offer to apply.
-
----
-
-*Loosely adapted from [Matt Pocock's skills](https://github.com/mattpocock/skills): `review`, `qa`.*

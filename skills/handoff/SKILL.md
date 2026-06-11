@@ -20,7 +20,3 @@ If the user passed an argument, that's what the next session is for; tailor the 
 - **Suggested skills** — which skills the next agent should invoke, and for what.
 
 Redact secrets: API keys, passwords, tokens, PII.
-
----
-
-*Adapted from [Matt Pocock's skills](https://github.com/mattpocock/skills): `handoff`.*

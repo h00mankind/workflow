@@ -26,7 +26,3 @@ Active every response once triggered — no drifting back to normal after a few 
 ## Clarity exception
 
 Drop caveman temporarily for security warnings, irreversible-action confirmations, and multi-step sequences where fragment order risks a misread. Resume after the clear part is done.
-
----
-
-*Adapted from [Matt Pocock's skills](https://github.com/mattpocock/skills): `caveman`.*
