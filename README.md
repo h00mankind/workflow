@@ -25,12 +25,14 @@ From idea to shipped, each step a skill:
 - `skills/handoff/` — Compact the conversation into a handoff document a fresh agent can pick up.
 - `skills/caveman/` — Ultra-compressed response mode: full technical accuracy, ~75% fewer tokens.
 - `skills/write-a-skill/` — Create or revise skills in this repo's house style: one-word names, trigger-rich descriptions, concise bodies.
+- `skills/benchmark/` — Benchmark models head-to-head or eval skills (with-skill vs bare baseline) via parallel sub-agents and a blind judge. HTML report in `benchmarks/` (gitignored) showing the work first, stats after. Quick mode by default; `deep` for more tasks and contenders.
 
 ### Experimental
 
 **`experimental/`** — skills that are bets, not tools. Not installed by default.
 
 - `experimental/frontend-fable-mode/` — an attempt to bottle frontier-model frontend taste as a loadable operating mode for *any* model (Opus, GPT, Gemini, …): forced design commitment, system-before-pixels, craft details, a banned list for the generic AI look, and a mandatory hostile self-critique loop run twice. Load it as a skill or paste it into a system prompt.
+- `experimental/code-fable-mode/` — the same bet for agentic coding: bottle the *behaviors* behind frontier coding scores — evidence before edits, done-as-a-check (name the command that proves it before editing), surgical diffs, a banned list for generic AI code tells (swallowed exceptions, weakened tests, drive-by refactors), and the same mandatory hostile self-critique loop run twice. Load it as a skill or paste it into a system prompt.
 
 Experimental skills aren't picked up by a plain `skills add` (it only scans `skills/`). Install them with `--full-depth`:
 
