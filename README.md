@@ -20,11 +20,11 @@ From idea to shipped, each step a skill:
 - `skills/backend/` — Working discipline for server work: boundaries, authz, errors, migrations, verify against the real endpoint.
 - `skills/motion/` — Animation defaults: durations, easing, transform/opacity only, reduced motion.
 - `skills/audit/` — Audit-then-fix pass: `/audit ui`, `ux`, `code`, or `safety` (secrets, injection, authz, PII, destructive ops). Read-only severity-ranked findings by default, then offers to apply the fixes.
-- `skills/writing/` — Product copywriting: website copy, UI microcopy, error messages, empty states.
+- `skills/copywriting/` — Product copywriting: website copy, UI microcopy, error messages, empty states.
 - `skills/learn/` — Multi-session teaching: small HTML lessons grounded in a mission, with records, glossary, and trusted sources tracked in `docs/learn/<topic>/`. Bundles format files for each workspace doc.
 - `skills/handoff/` — Compact the conversation into a handoff document a fresh agent can pick up.
 - `skills/caveman/` — Ultra-compressed response mode: full technical accuracy, ~75% fewer tokens.
-- `skills/skill/` — Create or revise skills in this repo's house style: one-word names, trigger-rich descriptions, concise bodies.
+- `skills/write-a-skill/` — Create or revise skills in this repo's house style: one-word names, trigger-rich descriptions, concise bodies.
 
 ## Credits
 
@@ -37,7 +37,7 @@ A big chunk of this suite is adapted from **[Matt Pocock](https://github.com/mat
 - `learn` ← `teach` (including the workspace format files)
 - `caveman` ← `caveman`
 - `handoff` ← `handoff`
-- `skill` ← `write-a-skill`
+- `write-a-skill` ← `write-a-skill`
 
 If you like these, go get the originals: `npx skills add mattpocock/skills`. Thanks Matt 🙏
 
