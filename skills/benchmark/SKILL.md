@@ -30,24 +30,24 @@ For a skill eval, the task must sit in that skill's wheelhouse — eval `motion`
 
 ## 3. Run — parallel sub-agents, hermetically
 
-Create `benchmarks/<yyyy-mm-dd>-<slug>/` (and `benchmarks/` itself if missing; it's gitignored — runs stay local).
+Create `benchmarks/NNNN-<slug>/` — `NNNN` is the next zero-padded number after the highest existing run (`0007-opus-vs-sonnet-ui/`); create `benchmarks/` itself if missing (it's gitignored — runs stay local). Inside the run folder: task prompts in `prompts/`, any helper scripts in `scripts/`, contender artifacts and the report at the root. Nothing lands loose in `benchmarks/` itself.
 
 One sub-agent per cell (model × task, or condition × task), all launched in a single message so they run concurrently:
 
 - **Identical prompt** for every contender in a comparison — the only permitted difference is the model override or the prepended skill content (inline the full SKILL.md into the prompt; sub-agents don't inherit skills).
 - Each agent writes to its own file in the run folder (`a.html`, `b.html`, …) and is never told it's being benchmarked or who it's up against.
-- Record per run: model, condition, wallclock, and tokens **as the harness reports them for that agent result**. Anything not reported is `n/a` — never estimate silently.
+- Record per run into `stats.json`: exact model ID, effort level, condition, wallclock, output tokens, input + cache-read tokens, turns, cost, artifact size, and the run date — **as the harness reports them**. Anything not reported is `n/a` — never estimate silently.
 
 ## 4. Judge blind
 
 A fresh sub-agent gets the outputs relabeled A/B/C in shuffled order, the original task prompt, and 3–4 task-appropriate criteria. It scores each, picks a winner, and explains why — without knowing which model or condition produced what. Reveal the mapping only after the verdict is in.
 
-## 5. Report — result first
+## 5. Report — result first, always
 
-Write `<slug>-report.html` in the run folder (the slug in the filename keeps browser tabs and history tellable apart across runs), in this order:
+Every run ends with `<slug>-report.html` in the run folder — no exceptions, quick mode included (the slug in the filename keeps browser tabs tellable apart across runs). In this order:
 
 1. **The work itself** — side-by-side iframes for UI, rendered prose for copy, highlighted code for code. The reader sees what was made before any numbers.
-2. **Stats table** — per contender: model, condition, wallclock, tokens, judge score, winner badge.
+2. **Stats table** — per contender: exact model ID, effort level, condition, wallclock, output tokens, input + cache tokens, turns, cost, artifact size, judge scores per criterion, winner badge. Run date and harness go in the header.
 3. **Write-up** — the judge's verdict (now de-anonymized), your own observations, and an honesty note on sample size: a quick run is one task, one shot — indicative, not conclusive.
 
 Open the report (`open <slug>-report.html`) and end by offering the natural next step: a deep run, a rematch on a different task, or a new contender.
