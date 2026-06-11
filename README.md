@@ -32,6 +32,12 @@ From idea to shipped, each step a skill:
 
 - `experimental/frontend-fable-mode/` — an attempt to bottle frontier-model frontend taste as a loadable operating mode for *any* model (Opus, GPT, Gemini, …): forced design commitment, system-before-pixels, craft details, a banned list for the generic AI look, and a mandatory hostile self-critique loop run twice. Load it as a skill or paste it into a system prompt.
 
+Experimental skills aren't picked up by a plain `skills add` (it only scans `skills/`). Install them with `--full-depth`:
+
+```bash
+npx skills add h00mankind/workflow --skill frontend-fable-mode --full-depth -g
+```
+
 ## Credits
 
 A big chunk of this suite is adapted from **[Matt Pocock](https://github.com/mattpocock)**'s excellent [skills repo](https://github.com/mattpocock/skills) (MIT licensed) — simplified and reshaped to fit my workflow, but the ideas, structures, and much of the philosophy are his:
