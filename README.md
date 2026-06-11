@@ -26,6 +26,12 @@ From idea to shipped, each step a skill:
 - `skills/caveman/` — Ultra-compressed response mode: full technical accuracy, ~75% fewer tokens.
 - `skills/write-a-skill/` — Create or revise skills in this repo's house style: one-word names, trigger-rich descriptions, concise bodies.
 
+### Experimental
+
+**`experimental/`** — skills that are bets, not tools. Not installed by default.
+
+- `experimental/frontend-fable-mode/` — an attempt to bottle frontier-model frontend taste as a loadable operating mode for *any* model (Opus, GPT, Gemini, …): forced design commitment, system-before-pixels, craft details, a banned list for the generic AI look, and a mandatory hostile self-critique loop run twice. Load it as a skill or paste it into a system prompt.
+
 ## Credits
 
 A big chunk of this suite is adapted from **[Matt Pocock](https://github.com/mattpocock)**'s excellent [skills repo](https://github.com/mattpocock/skills) (MIT licensed) — simplified and reshaped to fit my workflow, but the ideas, structures, and much of the philosophy are his:
