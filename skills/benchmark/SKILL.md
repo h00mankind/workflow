@@ -1,6 +1,6 @@
 ---
 name: benchmark
-description: Benchmark models head-to-head or eval skills (with-skill vs bare baseline) on a calibrated mid-weight task — Claude models at any effort level, plus external CLI agents like codex, gemini, or cursor-agent. Parallel sub-agents do the work, a blind judge scores it, and an HTML report lands in benchmarks/ with a CursorBench-style leaderboard (score %, cost/task, tokens/task, steps/task) and score-vs-cost chart. Use when the user wants to benchmark, eval, compare, or A/B test models, skills, or coding agents, asks "which model is better at X" or "does this skill actually help", or says /benchmark, /benchmark model, /benchmark skill. Quick mode is the default (one task, minimal questions); "deep" runs more tasks and contenders.
+description: Benchmark models head-to-head or eval skills (with-skill vs bare baseline) on a calibrated mid-weight task — Claude models at any effort level, plus external CLI agents like codex, gemini, or cursor-agent. Parallel sub-agents do the work, a blind judge scores it, and an HTML report lands in benchmarks/ with a CursorBench-style leaderboard (score %, cost/task, tokens/task, steps/task). Use when the user wants to benchmark, eval, compare, or A/B test models, skills, or coding agents, asks "which model is better at X" or "does this skill actually help", or says /benchmark, /benchmark model, /benchmark skill. Quick mode is the default (one task, minimal questions); "deep" runs more tasks and contenders.
 ---
 
 # benchmark
@@ -51,9 +51,9 @@ The headline **score** is a percentage: criterion points earned ÷ points possib
 
 Every run ends with `<slug>-report.html` in the run folder — no exceptions, quick mode included (the slug in the filename keeps browser tabs tellable apart across runs). In this order:
 
-1. **Score-vs-cost chart** — inline SVG scatter: y = score %, x = average cost per task (x reversed so cheap-and-good lands top-right), one labeled point per contender; same-model variants (efforts, with/without skill) joined by a line. If cost is `n/a`, fall back to output tokens on x.
-2. **Leaderboard table** — contenders ranked by score, one row each: rank, model (+ condition/effort), **Score %**, **Cost / task**, **Tokens / task** (output), **Steps / task** (tool uses), wallclock, winner badge. Per-task numbers are averages in deep mode. Numbers right-aligned, `tabular-nums`. Exact model IDs, run date, and harness go in the header; per-criterion judge scores in a details row or secondary table.
-3. **The work itself** — side-by-side iframes for UI, rendered prose for copy, highlighted code for code.
+1. **The task brief** — the exact prompt the contenders received, verbatim, so the reader judges the work against what was actually asked.
+2. **The work itself** — side-by-side iframes for UI, rendered prose for copy, highlighted code for code.
+3. **Leaderboard table** — contenders ranked by score, one row each: rank, model (+ condition/effort), **Score %**, **Cost / task**, **Tokens / task** (output), **Steps / task** (tool uses), wallclock, winner badge. Per-task numbers are averages in deep mode. Numbers right-aligned, `tabular-nums`. Exact model IDs, run date, and harness go in the header; per-criterion judge scores in a secondary table. No charts.
 4. **Write-up** — the judge's verdict (now de-anonymized), your own observations, and an honesty note on sample size: a quick run is one task, one shot — indicative, not conclusive.
 
 Open the report (`open <slug>-report.html`) and end by offering the natural next step: a deep run, a rematch on a different task, or a new contender.
