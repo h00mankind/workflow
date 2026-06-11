@@ -57,7 +57,3 @@ A prototype is **throwaway code that answers a question** — usually the idea's
 5. **Surface the state** after every action so the user sees what changed.
 
 When the question is answered, write the answer into the idea file under `## Prototype findings` — the question, the verdict, what it changes — and update the status. Then delete the prototype or fold the validated decision into real code; don't leave it rotting.
-
----
-
-*The prototype operation is adapted from [Matt Pocock's skills](https://github.com/mattpocock/skills): `prototype`.*

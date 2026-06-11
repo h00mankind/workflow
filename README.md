@@ -28,7 +28,7 @@ From idea to shipped, each step a skill:
 
 ## Credits
 
-A big chunk of this suite is adapted from **[Matt Pocock](https://github.com/mattpocock)**'s excellent [skills repo](https://github.com/mattpocock/skills) — simplified and reshaped to fit my workflow, but the ideas, structures, and much of the philosophy are his:
+A big chunk of this suite is adapted from **[Matt Pocock](https://github.com/mattpocock)**'s excellent [skills repo](https://github.com/mattpocock/skills) (MIT licensed) — simplified and reshaped to fit my workflow, but the ideas, structures, and much of the philosophy are his:
 
 - `plan` ← `grill-me` + `grill-with-docs` + `to-prd` + `to-issues`
 - `idea` ← `prototype` (the prototype operation)

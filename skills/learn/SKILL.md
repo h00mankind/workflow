@@ -31,7 +31,3 @@ One self-contained HTML file per lesson — inline CSS/JS, opens directly in a b
 ## After each lesson
 
 Update the workspace while it's fresh: append qualifying insights to `RECORDS.md`, promote newly-understood terms to `GLOSSARY.md`, move anything worth keeping at hand into `reference/`, and prune `RESOURCES.md` if a source disappointed.
-
----
-
-*Adapted from [Matt Pocock's skills](https://github.com/mattpocock/skills): `teach`, including its format files.*

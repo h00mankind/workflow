@@ -61,7 +61,3 @@ In grill mode, present the breakdown and iterate until approved. In trust mode, 
 ## Publish
 
 Default: slices live in the plan doc as sections with checkboxes. If the repo has a GitHub remote and the user wants issues, file them with `gh issue create` in dependency order — blockers first, so "Blocked by" references real issue numbers.
-
----
-
-*Adapted from [Matt Pocock's skills](https://github.com/mattpocock/skills): `grill-me`, `grill-with-docs`, `to-prd`, `to-issues`.*

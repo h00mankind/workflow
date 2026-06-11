@@ -33,7 +33,3 @@ A skill is loaded by its description and judged by its brevity. The description 
 - [ ] At least one concrete example
 - [ ] Stands alone — sibling mentions are optional pointers, not dependencies
 - [ ] README "What's here" entry added or updated
-
----
-
-*Adapted from [Matt Pocock's skills](https://github.com/mattpocock/skills): `write-a-skill`.*

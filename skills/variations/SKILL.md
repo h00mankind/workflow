@@ -35,7 +35,3 @@ Use the same realistic data in every variant so the comparison is fair. Mock dat
 For each variant, 2–3 lines: what it optimizes for, what it sacrifices. Then recommend one — and steal the best detail from the losers. The winner is often variant 2's structure with variant 4's detail.
 
 Once a direction is chosen, the variant graduates into real code and the throwaway route gets deleted.
-
----
-
-*Adapted from [Matt Pocock's skills](https://github.com/mattpocock/skills): `design-an-interface` and `prototype`'s UI branch.*
