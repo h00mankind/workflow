@@ -16,10 +16,11 @@ From idea to shipped, each step a skill:
 - `skills/idea/` — Capture, list, validate, and prototype ideas in `docs/ideas/` with a status lifecycle (spark → validated → building → parked → dead). Capture ends by offering a throwaway prototype of the idea's riskiest assumption.
 - `skills/variations/` — 3–5 radically different takes on a component or UX flow, all on one route with a switcher.
 - `skills/plan/` — PRD in `docs/plans/` plus tracer-bullet vertical-slice issues (optionally filed via `gh`). Two modes: `grill` (one-question-at-a-time interview first) or `trust` (no questions, synthesize and deliver). Maintains the knowledge base as it goes: a domain glossary in `docs/CONTEXT.md` and decision records in `docs/adr/`.
-- `skills/frontend/` — Building and styling UI: components, state, design tokens, layout, responsive, interactive controls, accessibility, verify in a real browser.
-- `skills/backend/` — Working discipline for server work: boundaries, authz, errors, migrations, verify against the real endpoint.
+- `skills/frontend/` — Building and styling UI as a full operating mode: forced design commitment, token system before pixels, components/state/layout/accessibility discipline, craft details, a banned list for the generic AI look, and a mandatory hostile self-critique loop run twice. Also works pasted into another model's system prompt.
+- `skills/backend/` — Server work and non-UI coding as a full operating mode: evidence before edits, done-as-a-check, surgical diffs, boundaries/authz/errors/migrations discipline, a banned list for generic AI code tells, and the same mandatory self-critique loop. Also works pasted into another model's system prompt.
 - `skills/motion/` — Animation defaults: durations, easing, transform/opacity only, reduced motion.
 - `skills/audit/` — Audit-then-fix pass: `/audit ui`, `ux`, `code`, or `safety` (secrets, injection, authz, PII, destructive ops). Read-only severity-ranked findings by default, then offers to apply the fixes.
+- `skills/ship/` — Commit, push, and open pull requests with reviewer-ready git discipline: scoped diffs, protected user work, verification, deliberate commits, and compact PR bodies.
 - `skills/copywriting/` — Product copywriting: website copy, UI microcopy, error messages, empty states.
 - `skills/learn/` — Multi-session teaching: small HTML lessons grounded in a mission, with records, glossary, and trusted sources tracked in `docs/learn/<topic>/`. Bundles format files for each workspace doc.
 - `skills/handoff/` — Compact the conversation into a handoff document a fresh agent can pick up.
