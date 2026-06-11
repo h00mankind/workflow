@@ -1,9 +1,9 @@
 ---
-name: brand-name
-description: Generate and screen brand name candidates the way professional naming agencies do, across the full name-type taxonomy (descriptive, suggestive, invented, compound, portmanteau, acronym, synonym-driven, palindrome, reduplicative, foreign, altered-spelling, and more), screening on sound symbolism, syllable/pronounceability, distinctiveness (Abercrombie spectrum), and the standard evaluation criteria. Has two modes — quick (no questions, ~20 candidates, fast) and deep (a 5–10 question grill, then 100+ candidates down to a 20–30-name shortlist); defaults to deep when unspecified. Always outputs an interactive HTML artifact showing the whole candidate pool (naming matrix + score cards for the recommended set + compact chips for the rest), filterable by name-type and metaphor, where the user stars any candidate to build their own shortlist live, with reset and copy-as-markdown. Use whenever the user wants to name a company, product, feature, app, project, startup, band, or anything else; asks for "name ideas", "brand names", "what should I call this", "naming options", a rebrand, or help picking between names they already have. Generates candidates and screens them; stops short of legal trademark clearance and domain registration (it flags risks but is not a substitute for an attorney or a live trademark/domain search).
+name: name
+description: Generate and screen brand name candidates the way professional naming agencies do — across the full name-type taxonomy (descriptive, suggestive, invented, compound, portmanteau, acronym, palindrome, and more), screened on sound symbolism, pronounceability, and Abercrombie distinctiveness. Two modes — quick (no questions, ~20 candidates) and deep (a 5–10 question grill, then 100+ candidates down to a 20–30-name shortlist; the default). Always outputs an interactive HTML artifact of the whole candidate pool — naming matrix, filterable by type and metaphor, starrable into the user's own shortlist, with copy-as-markdown. Use whenever the user wants to name a company, product, feature, app, project, startup, or anything else; asks for "name ideas", "brand names", "what should I call this", a rebrand, or help picking between names they already have. Flags trademark and domain risks but is not legal clearance.
 ---
 
-# brand-name
+# name
 
 Name things the way Lexicon, Igor, A Hundred Monkeys, and Catchword do: **generate broad, then screen hard.** The breakthrough name is rarely in the first 20 — it's in the second hundred. Your job is to generate a wide, varied candidate set, run it through the screens below, and deliver the **whole pool plus a recommended shortlist** — always as an interactive HTML artifact the user can filter and re-curate — with the reasoning attached.
 
@@ -117,7 +117,7 @@ Don't just dump a list. Return a shortlist — **20–30 survivors in deep mode,
 
 ## Output format
 
-**Always produce an HTML artifact** (via the `to-html` skill) — in both modes. A naming result is inherently spatial *and* interactive: the user wants to compare candidates, filter, and curate their own shortlist. So the artifact isn't a static report — it's a **triage interface** the user drives. Build:
+**Always produce an HTML artifact** — in both modes. A naming result is inherently spatial *and* interactive: the user wants to compare candidates, filter, and curate their own shortlist. So the artifact isn't a static report — it's a **triage interface** the user drives. Build:
 
 - a **naming matrix** (e.g. Descriptive↔Abstract × Real↔Coined, or axes tailored to the brief) with **every candidate plotted** (recommended ones as larger dots, the rest smaller), and the category/competitor cluster drawn as a zone to name *away* from;
 - **the whole pool, all of it visible** — never just the shortlist. This is the #1 thing to get right: if you generated 100, the artifact must show 100. Use a **two-tier layout** so the page stays scannable:
@@ -135,7 +135,7 @@ Keep selection state in a plain JS structure (e.g. a `Set` of candidate ids); th
 
 **Before handing it over, verify the wiring** (the two bugs that bite: only the shortlist renders instead of the whole pool, and Copy fails silently). Confirm the candidate count on the page equals what you generated, that starring a chip *and* a card both update the live panel + count, that Reset restores the default set, and that the type×metaphor filters combine. If you have a browser tool available, drive it; otherwise read back the rendered counts.
 
-**Follow the `to-html` skill** for everything else about the artifact — design tokens, theme switcher, single self-contained file, overflow guardrails, no browser storage, **and where to save it.** Don't hardcode a destination here; `to-html` decides the path and reports it. One addition: naming outputs are private working material, so if it lands in a repo, make sure that artifact directory is gitignored (add the rule if it isn't) — candidates shouldn't get published.
+**Artifact mechanics:** one self-contained file — inline CSS/JS, opens by double-click, no browser storage — with overflow guardrails so long names can't break the layout, and its own personality/theme. Save to `<repo-root>/docs/artifacts/` when in a git repo (create it, and make sure it's gitignored — naming candidates are private working material that shouldn't get published), otherwise `~/Downloads/`. End by reporting the absolute path and an open command.
 
 Only drop to plain markdown if the user explicitly asks for a chat answer / no artifact.
 
