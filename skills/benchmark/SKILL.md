@@ -1,6 +1,6 @@
 ---
 name: benchmark
-description: Benchmark models head-to-head or eval skills (with-skill vs bare baseline) on a calibrated mid-weight task — parallel sub-agents do the work, a blind judge scores it, and an HTML report lands in benchmarks/ with a CursorBench-style leaderboard (score %, cost/task, tokens/task, steps/task) and score-vs-cost chart. Use when the user wants to benchmark, eval, compare, or A/B test models or skills, asks "which model is better at X" or "does this skill actually help", or says /benchmark, /benchmark model, /benchmark skill. Quick mode is the default (one task, minimal questions); "deep" runs more tasks and contenders.
+description: Benchmark models head-to-head or eval skills (with-skill vs bare baseline) on a calibrated mid-weight task — Claude models at any effort level, plus external CLI agents like codex, gemini, or cursor-agent. Parallel sub-agents do the work, a blind judge scores it, and an HTML report lands in benchmarks/ with a CursorBench-style leaderboard (score %, cost/task, tokens/task, steps/task) and score-vs-cost chart. Use when the user wants to benchmark, eval, compare, or A/B test models, skills, or coding agents, asks "which model is better at X" or "does this skill actually help", or says /benchmark, /benchmark model, /benchmark skill. Quick mode is the default (one task, minimal questions); "deep" runs more tasks and contenders.
 ---
 
 # benchmark
@@ -12,7 +12,8 @@ A benchmark is only as fair as its blindest part: identical prompts, isolated ru
 Parse the argument for a target (`model` or `skill`) and a mode (`deep`; quick otherwise). Ask only what's missing:
 
 - No target → one question: benchmark **models** or **skills**?
-- **Model · quick** — contenders are whatever the user named, else the session's model plus one sensible rival; one task. **Model · deep** — ask how many and which (sub-agent overrides available: fable, opus, sonnet, haiku); 2–3 tasks.
+- **Model · quick** — contenders are whatever the user named, else the session's model plus one sensible rival; one task. **Model · deep** — ask how many and which; 2–3 tasks.
+- Contenders can be **Claude models at any effort** (fable, opus, sonnet, haiku × low/medium/high/xhigh/max) or **external CLI agents** (codex, gemini, cursor-agent, …) — see §3 for how each runs.
 - **Skill · quick** — one skill, one task, two conditions: *with-skill* vs *bare* on the same model. **Skill · deep** — several skills, or two skills pitted against each other on shared ground.
 
 In quick mode never ask more than one question total — pick a task yourself, state it, and let the user veto.
@@ -34,7 +35,9 @@ Create `benchmarks/NNNN-<slug>/` — `NNNN` is the next zero-padded number after
 
 One sub-agent per cell (model × task, or condition × task), all launched in a single message so they run concurrently:
 
-- **Identical prompt** for every contender in a comparison — the only permitted difference is the model override or the prepended skill content (inline the full SKILL.md into the prompt; sub-agents don't inherit skills).
+- **Identical prompt** for every contender in a comparison — the only permitted difference is the model override, the effort, or the prepended skill content (inline the full SKILL.md into the prompt; sub-agents don't inherit skills).
+- **Claude contender at a specific effort** — the Agent tool's `model` override can't carry an effort, so write a throwaway agent definition first: `.claude/agents/bench-<model>-<effort>.md` with frontmatter `name`, `description`, `model: <model>`, `effort: <low|medium|high|xhigh|max>`, `tools: Write, Read, Bash`, and a one-line generic body ("Complete the task exactly as given."). Spawn the cell with that agent type, and delete the `bench-*` files when the run ends. If the fresh definition isn't picked up in-session, fall back to the plain model override and record the effort that actually applied — never label a run with an effort you didn't verify.
+- **External CLI contender** (codex, gemini, cursor-agent, …) — first probe with `command -v`; if missing, say so and drop the contender rather than substituting silently. Run it headless via Bash in background with the identical prompt from a file, e.g. `codex exec "$(cat prompts/task.md)"`, `gemini -p "$(cat prompts/task.md)"`, `cursor-agent -p "$(cat prompts/task.md)"` — check `--help` for the non-interactive flag and how to pin a model. Run each in its own subdirectory so file outputs can't collide, with a wallclock timeout ~3× the task budget. External CLIs report usage differently or not at all: parse tokens/cost from their output if printed, else `n/a` — the judge scores their artifacts identically either way.
 - Each agent writes to its own file in the run folder (`a.html`, `b.html`, …) and is never told it's being benchmarked or who it's up against.
 - Record per run into `stats.json`: exact model ID, effort level, condition, wallclock, output tokens, input + cache-read tokens, steps (tool uses), cost, artifact size, and the run date — **as the harness reports them**. Anything not reported is `n/a` — never estimate silently. Cost: if the harness doesn't report it, compute from token counts × the model's current per-token prices (consult the claude-api reference) and mark it *computed*; if prices are unknown, `n/a`.
 
