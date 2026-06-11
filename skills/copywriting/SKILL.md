@@ -1,9 +1,9 @@
 ---
-name: writing
+name: copywriting
 description: Product copywriting — website copy, UI microcopy (buttons, labels, empty states, errors), and UX flow copy (onboarding, notifications, confirmations). Use when writing or rewording headlines, landing pages, button labels, error messages, tooltips, or any words a user will read in the product.
 ---
 
-# writing
+# copywriting
 
 Write words that help the user do the thing. Every string earns its place.
 

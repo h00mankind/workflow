@@ -1,9 +1,9 @@
 ---
-name: skill
-description: Create or revise a skill in this repo, following its house style — one-word names, trigger-rich descriptions, concise bodies, combined skills with modes or targets over many narrow ones. Use when the user wants to create, write, improve, simplify, or combine a skill, or says "make a skill for X".
+name: write-a-skill
+description: Create or revise a skill in this repo, following its house style — one-word names where possible, trigger-rich descriptions, concise bodies, combined skills with modes or targets over many narrow ones. Use when the user wants to create, write, improve, simplify, or combine a skill, or says "make a skill for X".
 ---
 
-# skill
+# write-a-skill
 
 A skill is loaded by its description and judged by its brevity. The description does the triggering; the body does the teaching.
 
