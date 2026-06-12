@@ -9,9 +9,9 @@ A skill is loaded by its description and judged by its brevity. The description 
 
 ## House style
 
-- **One-word name** when possible. Prefer a target argument (`/audit ui`) or a mode (`plan` grill/trust) over a family of narrow sibling skills.
+- **One-word name** when possible. Prefer a target argument (`/improve` ui) or a mode (`plan` grill/trust) over a family of narrow sibling skills.
 - **Check the suite first.** If an existing skill half-covers the request, extend or combine it instead of adding a sibling.
-- **Default postures:** report first, fix on approval; capture outputs to `docs/` (ideas, plans, learn) so sessions compound; end by offering the natural next step (idea → plan, audit → fixes).
+- **Default postures:** report first, fix on approval; capture outputs to `docs/` (ideas, plans, learn) so sessions compound; end by offering the natural next step (idea → plan, improve → fixes).
 - **Every skill stands alone.** Sibling skills are optional pointers, never requirements — if another skill's rules are genuinely needed, inline the one or two essential lines instead of "follow /x".
 
 ## Description — the only part the agent sees when choosing
