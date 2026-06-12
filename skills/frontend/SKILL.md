@@ -61,12 +61,16 @@ Use the project's existing tokens, or declare these as CSS custom properties bef
 - Optical alignment over box alignment: icons vertically centered against text, bullets hanging, button text optically centered.
 - Long content can't break layout: `overflow-wrap: anywhere` on inline code/URLs, ellipsis where truncation is honest.
 - `::selection` tinted to the palette. Scroll containers get `overscroll-behavior: contain`.
+- Font rendering: `-webkit-font-smoothing: antialiased` + `-moz-osx-font-smoothing: grayscale` on the root when type looks heavy (especially light text on dark); `text-rendering: optimizeLegibility` for display sizes only.
+- Scrollbars: never the default gray blocks inside a styled UI. Style them thin and palette-tinted (`scrollbar-width: thin` + `scrollbar-color`, or `::-webkit-scrollbar` ~8px with a rounded translucent thumb and transparent track); `scrollbar-gutter: stable` on containers that toggle overflow so content doesn't jump.
+- Native widgets match the theme: `color-scheme` set so scrollbars/form controls render light or dark correctly; `accent-color` on checkboxes, radios, progress.
+- `cursor: pointer` on interactive elements only — not on disabled ones; `user-select: none` on button/control labels so double-clicks don't highlight; `-webkit-tap-highlight-color: transparent` with a proper active state instead.
 - Realistic data in mocks — "Lena Okafor, $4,820.00, 2 min ago" — never "John Doe, $100, Lorem ipsum". Fake-looking data makes real design look fake.
 
 ## Accessibility — non-negotiable
 
 - Semantic elements: `button` for actions, `a` for navigation, `label` wired to every input.
-- One icon library per project; decorative icons get `aria-hidden`, meaningful ones get a label. No emoji as icons.
+- One icon library per project; decorative icons get `aria-hidden`, meaningful ones get a label. Never emoji or unicode glyphs (✓ ✕ ▸ ⚙) as icons — they render inconsistently across platforms and can't take stroke width or color tokens; use real SVG icons at a consistent size and stroke.
 - Announce async status changes with `aria-live="polite"`.
 
 ## Motion
