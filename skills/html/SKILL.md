@@ -1,9 +1,9 @@
 ---
-name: to-html
+name: html
 description: Produce a single-file HTML artifact instead of a wall of markdown when the answer is spatial, side-by-side, interactive, or live-rendered — letting the reader see it at a glance rather than reconstruct it from prose. Use whenever the user asks for an explanation, plan, design exploration, code review or PR writeup, architecture map, design-system sheet, clickable flow, slide deck, status report, incident timeline, research explainer, glossary, comparison, flowchart, illustration set, triage board, or any deliverable they'll skim, scan, point at, or hand off — even when they don't say "HTML" or "artifact". Skip for chat answers, quick replies, code snippets to paste into an editor, or anything that must round-trip to a non-HTML format.
 ---
 
-# to-html
+# html
 
 Swap the wall of markdown for one self-contained `.html` file. Plans, explainers, comparisons, maps, and post-mortems are *spatial information* that markdown flattens — a side-by-side, an annotated diff, or a clickable prototype turns something the reader would skim into something they actually read.
 

@@ -6,7 +6,7 @@ My personal Claude Code skills.
 
 **`skills/` — for CLI agents** (Claude Code, Codex, Cursor, etc.). Installable via `skills.sh`.
 
-- `skills/to-html/` — Produce single-file HTML artifacts instead of walls of markdown, each themed with a personality that fits its content.
+- `skills/html/` — Produce single-file HTML artifacts instead of walls of markdown, each themed with a personality that fits its content.
 - `skills/name/` — Generate and screen brand name candidates the way naming agencies do (taxonomy spread, sound symbolism, Abercrombie distinctiveness). Two modes — `quick` (no questions, ~20 names) and `deep` (a 5–10 question grill, then 100+ candidates). Outputs an interactive HTML artifact you filter and star into your own shortlist. Bundles `reference.md`, a deep-dive on naming theory, law, and case studies.
 
 ### Workflow suite
@@ -19,7 +19,7 @@ From idea to shipped, each step a skill:
 - `skills/frontend/` — Building and styling UI as a full operating mode: forced design commitment, token system before pixels, components/state/layout/accessibility discipline, craft details, a banned list for the generic AI look, and a mandatory hostile self-critique loop run twice. Also works pasted into another model's system prompt.
 - `skills/backend/` — Server work and non-UI coding as a full operating mode: evidence before edits, done-as-a-check, surgical diffs, boundaries/authz/errors/migrations discipline, a banned list for generic AI code tells, and the same mandatory self-critique loop. Also works pasted into another model's system prompt.
 - `skills/motion/` — Animation defaults: durations, easing, transform/opacity only, reduced motion.
-- `skills/audit/` — Audit-then-fix pass: `/audit ui`, `ux`, `code`, or `safety` (secrets, injection, authz, PII, destructive ops). Read-only severity-ranked findings by default, then offers to apply the fixes.
+- `skills/improve/` — Audit-then-improve pass over `ui`, `ux`, `code`, `security`, or `all` (deep, adds an architecture/deepening pass). Always asks area + mode first: audit only, or execute the findings in one go.
 - `skills/ship/` — Commit, push, and open pull requests with reviewer-ready git discipline: scoped diffs, protected user work, verification, deliberate commits, and compact PR bodies.
 - `skills/copywriting/` — Product copywriting: website copy, UI microcopy, error messages, empty states.
 - `skills/learn/` — Multi-session teaching: small HTML lessons grounded in a mission, with records, glossary, and trusted sources tracked in `docs/learn/<topic>/`. Bundles format files for each workspace doc.
@@ -65,7 +65,7 @@ Use [skills.sh](https://www.skills.sh/) — symlinks by default, so `npx skills 
 npx skills add h00mankind/workflow -g
 
 # A single skill
-npx skills add h00mankind/workflow --skill to-html -g
+npx skills add h00mankind/workflow --skill html -g
 
 # Project-scoped (drops into ./<agent>/skills/ in your project)
 npx skills add h00mankind/workflow
@@ -77,13 +77,9 @@ Restart Claude Code (or open a new session) and the skills will show up.
 
 ```bash
 npx skills update              # pull latest for installed skills
-npx skills remove to-html      # uninstall a skill
+npx skills remove html         # uninstall a skill
 npx skills list                # see what's installed
 ```
-
-## CSS CDN (retired)
-
-`h00man-variables.css` was removed — artifacts are now themed per-context instead of from shared tokens. Anything still linking the old CDN URLs keeps working: `@v2/skills/to-html/h00man-variables.css` and `@v1/h00man-variables.css` are pinned to immutable tags forever.
 
 ## What's a symlink?
 
