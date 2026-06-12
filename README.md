@@ -81,6 +81,13 @@ npx skills remove html         # uninstall a skill
 npx skills list                # see what's installed
 ```
 
+> **Renamed (2026-06-12):** `to-html` → `html`, `audit` → `improve`. `npx skills update` won't rename an installed skill — reinstall under the new name:
+>
+> ```bash
+> npx skills remove to-html && npx skills add h00mankind/workflow --skill html -g
+> npx skills remove audit && npx skills add h00mankind/workflow --skill improve -g
+> ```
+
 ## What's a symlink?
 
 A symbolic link is a tiny file that points to another path. `skills.sh` keeps one canonical copy of each skill in `~/.skills/` and symlinks `~/.claude/skills/<name>` to it. When Claude Code reads the symlink, the OS transparently uses the canonical copy. `npx skills update` refreshes the canonical copy, so every symlinked location sees the new content at once.
