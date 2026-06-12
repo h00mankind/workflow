@@ -52,7 +52,7 @@ The headline **score** is a percentage: criterion points earned ÷ points possib
 Every run ends with `<slug>-report.html` in the run folder — no exceptions, quick mode included (the slug in the filename keeps browser tabs tellable apart across runs). In this order:
 
 1. **The task brief** — the exact prompt the contenders received, verbatim, so the reader judges the work against what was actually asked.
-2. **The work itself** — side-by-side iframes for UI, rendered prose for copy, highlighted code for code.
+2. **The work itself** — side-by-side iframes for UI, rendered prose for copy, highlighted code for code. For UI/site artifacts, put a visible `Open full preview` link styled as a button immediately above each iframe, pointing at the artifact with `target="_blank"` and `rel="noopener"` so the reader can inspect it in a full new tab.
 3. **Leaderboard table** — contenders ranked by score, one row each: rank, model (+ condition/effort), **Score %**, **Cost / task**, **Tokens / task** (output), **Steps / task** (tool uses), wallclock, winner badge. Per-task numbers are averages in deep mode. Numbers right-aligned, `tabular-nums`. Exact model IDs, run date, and harness go in the header; per-criterion judge scores in a secondary table. No charts.
 4. **Write-up** — the judge's verdict (now de-anonymized), your own observations, and an honesty note on sample size: a quick run is one task, one shot — indicative, not conclusive.
 
