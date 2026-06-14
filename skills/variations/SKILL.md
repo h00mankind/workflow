@@ -26,7 +26,7 @@ Name each variant after its direction, not "Option A/B/C".
 ## 3. Build them all in one place
 
 - **App project:** one throwaway route, variants switched via a URL param and a floating switcher bar. Obey the project's routing conventions; mark the route as a prototype.
-- **No app:** a single self-contained HTML file with the same switcher.
+- **No app:** a single self-contained HTML file with the same switcher. Save to `docs/html/<thing>-variations.html`; delete after picking a winner — it's a comparison artifact, not a permanent record.
 
 Use the same realistic data in every variant so the comparison is fair. Mock data, never wired to real mutations.
 
