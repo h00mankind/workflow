@@ -37,7 +37,7 @@ No shared stylesheet; the subject dictates the look. A post-mortem reads like a 
 ## Where to save
 
 1. A path the user named, if any.
-2. In a git repo → `<repo-root>/docs/artifacts/` (create it if missing).
+2. In a git repo → `<repo-root>/docs/html/` (create it if missing).
 3. Otherwise → `~/Downloads/`.
 
 Filename: kebab-case slug from the request, no timestamp. Always end the turn with the absolute path and an open command — don't bury it in prose.

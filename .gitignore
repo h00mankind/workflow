@@ -8,8 +8,6 @@
 # Node (in case skills.sh ever drops anything here)
 node_modules/
 
-# Generated artifacts — local outputs, not for sharing
-docs/artifacts/
 
 # Reference material from other people's skill repos — inspiration only, not ours to publish
 references/
