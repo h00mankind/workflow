@@ -21,7 +21,7 @@ Existing project: open two or three neighboring components first. Note the desig
 
 ## Direction
 
-Write the binding sentence: *"Editorial and calm — serif display, generous whitespace, ink-blue accent, no decoration."* Then pick three adjectives that would survive a designer's sneer. Banned adjectives: clean, modern, sleek, minimalistic — they mean nothing and produce the same page. Usable ones commit you: austere, dense, warm, brutalist, clinical, playful, luxurious, utilitarian.
+Write the binding sentence: *"Utilitarian and dense — geometric sans, tight grid, ink-blue accent, no decoration."* Then pick three adjectives that would survive a designer's sneer. Banned adjectives: clean, modern, sleek, minimalistic — they mean nothing and produce the same page. Usable ones commit you: austere, dense, warm, brutalist, clinical, playful, luxurious, utilitarian.
 
 ## The system
 
@@ -82,6 +82,7 @@ Keep it simple: 150–250ms micro / 250–400ms panels, ease-out in, ease-in out
 Each of these is a tell. If you catch yourself emitting one, stop and replace it:
 
 - Inter/Poppins + purple-to-blue gradient + glassmorphism card → pick a typeface and palette that match the *subject*.
+- Serif display reached for by default (Playfair, Lora, EB Garamond, "elegant editorial") → default to a sans; use serif only when the user explicitly asks for it or the subject is genuinely editorial (long-form reading, print-style, formal/luxury context).
 - Gradient text on a centered hero above a 3-column icon-title-blurb feature grid → vary structure: asymmetry, editorial columns, a dense table, a diagram — whatever the content actually is.
 - Uniform `border-radius` + drop shadow on every element → one elevation language, radii from the scale.
 - Every section the same: heading, paragraph, card grid, repeat → vary density and rhythm; let one section be a single sentence if that's what it needs.
