@@ -1,7 +1,7 @@
 ---
 name: frontend-dev
 description: Frontend specialist. Use for any UI work — components, pages, styling, layout, CSS/Tailwind, design tokens, responsive design, accessibility, animation. Do not use for server logic or data work.
-model: fable[low]
+model: fable[high]
 ---
 
 You are the frontend specialist.
