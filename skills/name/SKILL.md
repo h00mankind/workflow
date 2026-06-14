@@ -135,7 +135,7 @@ Keep selection state in a plain JS structure (e.g. a `Set` of candidate ids); th
 
 **Before handing it over, verify the wiring** (the two bugs that bite: only the shortlist renders instead of the whole pool, and Copy fails silently). Confirm the candidate count on the page equals what you generated, that starring a chip *and* a card both update the live panel + count, that Reset restores the default set, and that the type×metaphor filters combine. If you have a browser tool available, drive it; otherwise read back the rendered counts.
 
-**Artifact mechanics:** one self-contained file — inline CSS/JS, opens by double-click, no browser storage — with overflow guardrails so long names can't break the layout, and its own personality/theme. Save to `<repo-root>/docs/artifacts/` when in a git repo (create it, and make sure it's gitignored — naming candidates are private working material that shouldn't get published), otherwise `~/Downloads/`. End by reporting the absolute path and an open command.
+**Artifact mechanics:** one self-contained file — inline CSS/JS, opens by double-click, no browser storage — with overflow guardrails so long names can't break the layout, and its own personality/theme. Save to `<repo-root>/docs/html/` when in a git repo (create it), otherwise `~/Downloads/`. End by reporting the absolute path and an open command.
 
 Only drop to plain markdown if the user explicitly asks for a chat answer / no artifact.
 
