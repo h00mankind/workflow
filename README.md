@@ -4,6 +4,8 @@ My personal Claude Code skills.
 
 ## What's here
 
+**`docs/` — cross-tool knowledge base.** Glossary (`docs/CONTEXT.md`), decision records (`docs/adr/`), PRDs (`docs/plans/`). Read by Claude and Codex globals so context follows the work across tools. See [`docs/adr/0001-shared-context-split.md`](docs/adr/0001-shared-context-split.md).
+
 **`skills/` — for CLI agents** (Claude Code, Codex, Cursor, etc.). Installable via `skills.sh`.
 
 - `skills/html/` — Produce single-file HTML artifacts instead of walls of markdown, each themed with a personality that fits its content.

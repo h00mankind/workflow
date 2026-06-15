@@ -77,7 +77,7 @@ dropped — it was noise for solo work with a good `README.md`. See
 - [x] `docs/adr/0001-shared-context-split.md` — this decision
 - [x] `docs/plans/shared-context-split.md` — this PRD
 
-### Slice 4: Commit and push — NEXT
+### Slice 4: Commit and push — DONE
 
-- [ ] Commit `docs/` additions
-- [ ] Push to `origin/main`
+- [x] Commit `docs/` additions
+- [x] Push to `origin/main`
