@@ -47,10 +47,10 @@ Filename: kebab-case slug from the request, no timestamp. Always end the turn wi
 Long URLs and shell one-liners will eventually punch out of cards and table cells. Always include:
 
 ```css
-code { overflow-wrap: anywhere; word-break: break-word; }   /* inline code wraps */
-pre { overflow-x: auto; max-width: 100%; }                   /* block code scrolls */
+:not(pre) > code { overflow-wrap: anywhere; word-break: break-word; }  /* inline code wraps */
+pre { overflow-x: auto; max-width: 100%; }                              /* block code scrolls */
 pre code { overflow-wrap: normal; word-break: normal; white-space: pre; }
-.card, .sidebar, .grid > * { min-width: 0; }                 /* flex/grid children can shrink */
+.card, .sidebar, .grid > * { min-width: 0; }                            /* flex/grid children can shrink */
 ```
 
 If there's a sidebar TOC with scrollspy: wrap each `<h2>` + its content in a `<section id>`, observe the **sections** with an `IntersectionObserver` (`threshold: [0, .25, .5, .75, 1]`), and highlight the section with the **largest visible area**. Don't observe bare headings with a tight `rootMargin` — it flips the active link to the next section while the reader is still mid-way through the previous one.

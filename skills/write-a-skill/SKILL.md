@@ -32,4 +32,5 @@ A skill is loaded by its description and judged by its brevity. The description 
 - [ ] Body under ~100 lines (split to a bundled file if over)
 - [ ] At least one concrete example
 - [ ] Stands alone — sibling mentions are optional pointers, not dependencies
-- [ ] README "What's here" entry added or updated
+- [ ] No TBD, "coming soon", or unresolved placeholders in the body
+- [ ] Top-level `README.md` "What's here" entry added or updated

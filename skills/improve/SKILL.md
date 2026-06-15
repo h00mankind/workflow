@@ -1,6 +1,6 @@
 ---
 name: improve
-description: Audit-then-improve pass over UI, UX, code, security, or all of them at once (deep) — always starts by asking what area to improve and whether to just audit or audit-and-fix in one go. Produces severity-ranked findings with evidence; in execute mode it applies the fixes immediately after. Use when the user wants a review, audit, critique, security review, asks "is this safe to ship", or wants something polished, cleaned up, hardened, refactored, or improved.
+description: Audit-then-improve pass over UI, UX, code, security, or all of them at once (deep) — always starts by asking what area to improve and which mode: audit (report only) or execute (audit, then apply every safe fix in one go). Produces severity-ranked findings with evidence; in execute mode it applies the fixes immediately after. Use when the user wants a review, audit, critique, security review, asks "is this safe to ship", or wants something polished, cleaned up, hardened, refactored, or improved.
 ---
 
 # improve
@@ -12,7 +12,7 @@ Find what's weak, prove it, then make it better. Two questions first, always.
 Open with **one AskUserQuestion call** containing both questions — even if the user named an area, confirm the mode (and vice versa):
 
 1. **Area** — `ui` / `ux` / `code` / `security` / `all (deep)`. Deep runs every area and adds an architecture pass.
-2. **Mode** — **Audit only** (report findings, change nothing) or **Execute** (audit, then apply every safe fix in one go without a second confirmation).
+2. **Mode** — **audit** (report findings, change nothing) or **execute** (audit, then apply every safe fix in one go without a second confirmation).
 
 If the user also gave a scope (a page, flow, module, branch, diff), keep it; otherwise default to the current diff or most recent work and state the assumption.
 
