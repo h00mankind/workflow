@@ -155,22 +155,35 @@ elif echo "$model_lower" | grep -q "fable";  then MODEL_COLOR='\033[38;5;213m'
 else                                              MODEL_COLOR="$FG_CYAN"
 fi
 
-# ─── Path shortener ──────────────────────────────────────────────────────────
+# ─── Path shortener (middle truncation) ──────────────────────────────────────
+# Preserves the head (e.g. ~/) and the tail (leaf dirs) and elides the middle
+# with an ellipsis when the path exceeds max_len.
 shorten_path() {
   local path="$1" max_len="$2"
   [ -z "$path" ] && { echo ""; return; }
   path="${path/#$HOME/~}"
   if [ "$max_len" -eq 0 ] || [ "${#path}" -le "$max_len" ]; then
     echo "$path"
-  else
-    local short
-    short=$(echo "$path" | awk -F/ '{ if (NF>=2) printf "…/%s/%s", $(NF-1), $NF; else print $NF }')
-    if [ "${#short}" -le "$max_len" ]; then
-      echo "$short"
-    else
-      basename "$path"
-    fi
+    return
   fi
+
+  local ell="…"
+  # Reserve room for the ellipsis; split remainder between head and tail.
+  local budget=$(( max_len - 1 ))
+  [ "$budget" -lt 2 ] && { echo "$ell"; return; }
+  local tail_len=$(( (budget + 1) / 2 ))
+  local head_len=$(( budget - tail_len ))
+
+  local head="${path:0:head_len}"
+  local tail="${path: -tail_len}"
+
+  # Snap to path separators where possible so we cut between segments, not mid-name.
+  local head_cut="${head%/*}"
+  [ -n "$head_cut" ] && [ "$head_cut" != "$head" ] && head="${head_cut}/"
+  local tail_cut="${tail#*/}"
+  [ -n "$tail_cut" ] && [ "$tail_cut" != "$tail" ] && tail="/${tail_cut}"
+
+  echo "${head}${ell}${tail}"
 }
 
 # ─── Bar ─────────────────────────────────────────────────────────────────────
@@ -326,10 +339,10 @@ for ((i=0; i<${#LINE1_PARTS[@]}; i++)); do
 done
 echo -e "$LINE1"
 
-# Line 2: dir · branch
+# Line 2: branch · dir
 LINE2_PARTS=()
-[ -n "$DIR_TXT" ]    && LINE2_PARTS+=("$DIR_TXT")
 [ -n "$BRANCH_TXT" ] && LINE2_PARTS+=("$BRANCH_TXT")
+[ -n "$DIR_TXT" ]    && LINE2_PARTS+=("$DIR_TXT")
 LINE2=""
 for ((i=0; i<${#LINE2_PARTS[@]}; i++)); do
   if [ "$i" -eq 0 ]; then LINE2="${LINE2_PARTS[$i]}"
