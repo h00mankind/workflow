@@ -25,7 +25,7 @@ From idea to shipped, each step a skill:
 - `skills/improve/` — Audit-then-improve pass over `ui`, `ux`, `code`, `security`, or `all` (deep, adds an architecture/deepening pass). Always asks area + mode first: audit only, or execute the findings in one go.
 - `skills/ship/` — Commit, push, and open pull requests with reviewer-ready git discipline: scoped diffs, protected user work, verification, deliberate commits, and compact PR bodies.
 - `skills/copywriting/` — Product copywriting: website copy, UI microcopy, error messages, empty states.
-- `skills/learn/` — Multi-session teaching: small HTML lessons grounded in a mission, with records, glossary, and trusted sources tracked in `docs/learn/<topic>/`. Bundles format files for each workspace doc.
+- `skills/learn/` — Multi-session teaching: small HTML lessons grounded in a mission, built from a shared `assets/` component library so a course reads as one consistent thing, with records, glossary, and trusted sources tracked in `docs/learn/<topic>/`. Bundles format files for each workspace doc.
 - `skills/handoff/` — Compact the conversation into a handoff document a fresh agent can pick up.
 - `skills/caveman/` — Ultra-compressed response mode: full technical accuracy, ~75% fewer tokens.
 - `skills/write-a-skill/` — Create or revise skills in this repo's house style: one-word names, trigger-rich descriptions, concise bodies.
