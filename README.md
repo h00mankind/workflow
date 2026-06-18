@@ -9,7 +9,7 @@ My personal Claude Code skills.
 **`skills/` — for CLI agents** (Claude Code, Codex, Cursor, etc.). Installable via `skills.sh`.
 
 - `skills/html/` — Produce single-file HTML artifacts instead of walls of markdown, each themed with a personality that fits its content.
-- `skills/name/` — Generate and screen brand name candidates the way naming agencies do (taxonomy spread, sound symbolism, Abercrombie distinctiveness). Two modes — `quick` (no questions, ~20 names) and `deep` (a 5–10 question grill, then 100+ candidates). Outputs an interactive HTML artifact you filter and star into your own shortlist. Bundles `reference.md`, a deep-dive on naming theory, law, and case studies.
+- `skills/name/` — Generate and screen brand name candidates the way naming agencies do (taxonomy spread, sound symbolism, Abercrombie distinctiveness). Two modes — `quick` (no questions, ~20 names) and `deep` (a 5–10 question grill, then 100+ candidates). Outputs an interactive HTML artifact you filter and star into your own shortlist, built from a bundled `template.html` (the triage UI and state logic, rethemed per run). Also bundles `reference.md`, a deep-dive on naming theory, law, and case studies.
 
 ### Workflow suite
 
@@ -55,7 +55,8 @@ A big chunk of this suite is adapted from **[Matt Pocock](https://github.com/mat
 - `learn` ← `teach` (including the workspace format files)
 - `caveman` ← `caveman`
 - `handoff` ← `handoff`
-- `write-a-skill` ← `write-a-skill`
+- `write-a-skill` ← `write-a-skill` + `writing-great-skills` (the `reference.md` theory — predictability, the two loads, the information-hierarchy ladder, leading words, failure modes — comes from his [1.0.0](https://github.com/mattpocock/skills/releases/tag/mattpocock-skills%401.0.0) rewrite)
+- `backend`'s "Design deep modules" section ← `codebase-design` (module / interface / depth / seam, the deletion test)
 
 If you like these, go get the originals: `npx skills add mattpocock/skills`. Thanks Matt 🙏
 

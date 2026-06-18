@@ -33,6 +33,15 @@ Before touching anything, trace one existing endpoint end-to-end — route, hand
 - A new abstraction needs multiple call sites or a defended reason; used once, it's a function to inline.
 - Comments only for constraints the code can't express (the *why*, the invariant, the gotcha) — never to narrate the diff.
 
+## Design deep modules
+
+When the change introduces or reshapes a **module** — anything with an interface and an implementation, function to package — aim for **depth**: a lot of behaviour behind a small interface. The interface is everything a caller must know to use it correctly: not just the signature, but invariants, ordering, error modes, and required config. Deep means a large implementation behind a small interface; shallow means the interface is nearly as complex as the body — avoid it.
+
+- **The deletion test.** Imagine deleting the module. If complexity vanishes, it was a pass-through — inline it. If complexity reappears across N callers, it was earning its keep.
+- **The interface is the test surface.** Callers and tests cross the same **seam** — the place you can alter behaviour without editing there. If you need to test *past* the interface, the module is the wrong shape.
+- **Accept dependencies, don't create them.** `processOrder(order, gateway)` is testable; `processOrder(order)` that news up a `StripeGateway` inside is not. Return results over mutating in place where you can.
+- **One adapter is a hypothetical seam; two is a real one.** Don't add an interface until something actually varies across it. (Say *seam* or *interface*, not "boundary" — that's overloaded.)
+
 ## Boundaries, errors, data
 
 - **Validate at the edge, once.** Parse and validate external input at the boundary; from there, types carry the guarantee inward.
