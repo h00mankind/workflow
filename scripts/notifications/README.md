@@ -1,20 +1,48 @@
 # notifications
 
-Three small shell scripts that Claude Code's hooks call to drive desktop notifications and the statusline's live state badge.
+Small shell scripts that Claude Code's hooks call to drive desktop notifications and the statusline's live state badge.
 
 | Script | Fired by hook | What it does |
 |---|---|---|
 | `mark-working.sh` | `UserPromptSubmit` | Writes `working` to `~/.claude/agent-state` — statusline shows **WORKING**. |
-| `notify-stop.sh` | `Stop` | Writes `ready` to `~/.claude/agent-state`. If Zed isn't frontmost, sends a "Claude finished" desktop notification with a random message. |
-| `notify-input.sh` | `Notification` | Writes `waiting` to `~/.claude/agent-state`. If Zed isn't frontmost, sends a "Claude needs you" desktop notification. |
+| `notify-stop.sh` | `Stop` | Writes `ready` to `~/.claude/agent-state`, then sends a "Claude finished" notification routed to the session's host app. |
+| `notify-input.sh` | `Notification` | Writes `waiting` to `~/.claude/agent-state`, then sends a "Claude needs you" notification routed to the session's host app. |
+| `host-app.sh` | (sourced by the two notify scripts) | Detects which app hosts the session, whether you're looking at it, and builds the body label. |
 
 The state file is read by the [statusline](../statusline/README.md) script to render the **WORKING / READY / WAITING** badge on line 1.
 
 ---
 
-## Why a "frontmost = Zed" check?
+## What a notification looks like
 
-When Zed is already the foreground app, you can *see* Claude in the chat surface — a desktop notification would be noise. The scripts use `osascript` to check, and `exit 0` early when Zed is frontmost. State writes still happen unconditionally so the statusline stays accurate.
+| Line | Source |
+|---|---|
+| **title** | A random line from the message pool — `stop-messages.txt` (a "done" voice) or `input-messages.txt` (a "needs you" voice). The status is conveyed by the line itself. |
+| **body** | `<branch> · <project>`, derived from the session's `cwd` (the project is the folder name). Falls back to just `<project>` outside a git repo. |
+
+Example — Stop hook: title `Returning to standby mode.`, body `main · workflow`.
+
+The hook receives a JSON payload on stdin; the scripts read `cwd` from it to build the body label. (Claude Code's hook payload has no human-readable session name, so the branch + project is the most useful glanceable label.)
+
+---
+
+## How notifications are routed
+
+A session's **host app** is a property of its process tree, not of what's on screen. `host-app.sh` walks the hook's process ancestry up to the host `.app` and matches its command path — so a session in Ghostty stays "hosted by Ghostty" even after you alt-tab to a browser.
+
+`host_app` echoes one of `conductor` / `ghostty` / `zed` / `""` (unknown). The notify scripts route sound, icon, and click target from it:
+
+| Host | Sound (Stop / Input) | Icon | Click opens |
+|---|---|---|---|
+| `conductor` | `chu-chuu.aiff` (played via `afplay`) | `conductor-icon.png` | Conductor.app (`com.conductor.app`) |
+| `ghostty` | `Pop` / `Glass` | `notification-icon.png` | Ghostty (`com.mitchellh.ghostty`) |
+| `zed` / unknown | `Pop` / `Glass` | `notification-icon.png` | Zed (`dev.zed.Zed`) |
+
+### When does it stay silent?
+
+`frontmost_is` compares the detected host against the current frontmost app. If the session's own window is already focused (e.g. session in Ghostty **and** Ghostty is frontmost), there's no point pinging — the chat surface is the notification — so the script exits early. State writes still happen unconditionally so the statusline stays accurate.
+
+**Conductor is the exception:** it runs a bundled `claude` binary with no clickable window, so there's no "looking at it" state to detect. Conductor sessions always notify (the Chu Chuu sound is the cue) and the click opens Conductor.app.
 
 ---
 
@@ -22,16 +50,19 @@ When Zed is already the foreground app, you can *see* Claude in the chat surface
 
 ### 1. Requirements
 
-- macOS (uses `osascript` for the frontmost-app check).
+- macOS (uses `osascript` for the frontmost check, `afplay` for custom sounds).
 - [`terminal-notifier`](https://github.com/julienXX/terminal-notifier): `brew install terminal-notifier`. Scripts no-op gracefully if it's missing.
-- Two random-message files at `~/.claude/assets/`:
-  - `stop-messages.txt` — one phrase per line, picked at random when Claude finishes.
-  - `input-messages.txt` — one phrase per line, picked at random when Claude asks for input.
-- Optional: `~/.claude/assets/notification-icon.png` for the notification app icon.
+- Message pools at `~/.claude/assets/` — one phrase per line, picked at random for the title:
+  - `stop-messages.txt` — when Claude finishes.
+  - `input-messages.txt` — when Claude asks for input.
+- Icons / sounds at `~/.claude/assets/` (each is optional — a missing file degrades gracefully):
+  - `notification-icon.png` — shared Ghostty/Zed icon.
+  - `conductor-icon.png` — Conductor icon.
+  - `chu-chuu.aiff` — Conductor sound (any `afplay`-playable audio file).
 
 ### 2. Wire the hooks
 
-Edit `~/.claude/settings.json` and replace any existing inline hook commands with calls to these files:
+Edit `~/.claude/settings.json`:
 
 ```json
 {
@@ -66,14 +97,15 @@ Replace `/Users/YOU/` with your real path.
 
 | Want to change | Edit |
 |---|---|
-| Skip notifications when a *different* app is frontmost | The `front=` check in `notify-stop.sh` / `notify-input.sh` |
-| Different sounds | `-sound Pop` (Stop) and `-sound Glass` (Notification) — use any name from `/System/Library/Sounds/` |
-| Different icon | Replace `~/.claude/assets/notification-icon.png` (or change the `ICON=` path) |
-| Different random message pool | Edit `~/.claude/assets/{stop,input}-messages.txt` |
-| Always notify (even when Zed is frontmost) | Delete the `osascript` block in both scripts |
+| The title wording | `~/.claude/assets/{stop,input}-messages.txt` — one line per phrase. |
+| Add a new host app | Add a `case` arm in `host_app` (`host-app.sh`), then a matching arm in both notify scripts' routing `case`. |
+| Different sounds per host | The routing `case` in `notify-stop.sh` / `notify-input.sh`. Built-in names from `/System/Library/Sounds/`, or a file path for a custom sound. |
+| Different icon per host | Drop a PNG in `~/.claude/assets/` and point the `case` arm at it. |
+| The body label | The `session_label` helper in `host-app.sh`. |
+| Always notify, even when focused | Remove the `frontmost_is "$HOST" && exit 0` line. |
 
 ---
 
 ## Why these aren't inline in `settings.json`
 
-`settings.json` originally had these as multi-line bash one-liners embedded as JSON strings. That works but is awful to maintain: no syntax highlighting, no comments, escapes everywhere, hard to diff. Extracting to real `.sh` files makes them readable, version-controlled, and shareable.
+`settings.json` originally had these as multi-line bash one-liners embedded as JSON strings — no highlighting, no comments, escapes everywhere, hard to diff. Real `.sh` files are readable, version-controlled, and shareable.
