@@ -1,6 +1,6 @@
 ---
 name: improve
-description: Audit-then-improve pass over UI, UX, code, security, or all of them at once (deep) — always starts by asking what area to improve and which mode: audit (report only) or execute (audit, then apply every safe fix in one go). Produces severity-ranked findings with evidence; in execute mode it applies the fixes immediately after. Use when the user wants a review, audit, critique, security review, asks "is this safe to ship", or wants something polished, cleaned up, hardened, refactored, or improved.
+description: Audit-then-improve pass over UI, UX, code, security, or all of them at once (deep) — always starts by asking what area to improve and which mode: audit (report only) or execute (audit, then apply every safe fix in one go). Sweeps a checklist, then critiques like a hostile reviewer; for UI it inspects the rendered result. Produces severity-ranked findings with evidence; in execute mode it applies the fixes immediately after. Use when the user wants a review, audit, critique, security review, asks "is this safe to ship", or wants something polished, cleaned up, hardened, refactored, or improved.
 ---
 
 # improve
@@ -18,10 +18,36 @@ If the user also gave a scope (a page, flow, module, branch, diff), keep it; oth
 
 ## Process
 
-1. **Inspect the real thing.** For `ui` and `ux`, run the app and look at it — screenshots, clicked-through flows — not just source. For `code` and `security`, read the actual call paths, not just the files that changed.
+1. **Inspect the real thing.** For `ui` and `ux`, look at the rendered result, not the source — see *Seeing the UI* below. For `code` and `security`, read the actual call paths, not just the files that changed.
 2. **Sweep with the matching checklist** below, then go past it: cross-cutting patterns, inconsistencies between areas, things the checklist wouldn't catch.
-3. **Report** in the format below.
-4. **Execute mode:** apply the fixes immediately, smallest diff per finding, behavior unchanged — this raises quality, not functionality. Verify after: render the UI, walk the flow, run the code and tests. Findings too risky to patch inline (auth-model changes, migration rewrites, large architecture refactors) stay report-only — say so explicitly. **Audit mode:** stop after the report; end with "run `/improve` again in execute mode to apply these."
+3. **Critique like a hostile reviewer.** A checklist sweep finds the obvious; the findings that matter come from a second, adversarial read — see *The critique pass* below. A friendly reviewer finds nothing.
+4. **Report** in the format below.
+5. **Execute mode:** apply the fixes immediately, smallest diff per finding, behavior unchanged — this raises quality, not functionality. Verify after: re-inspect the UI, walk the flow, run the code and tests. Findings too risky to patch inline (auth-model changes, migration rewrites, large architecture refactors) stay report-only — say so explicitly. **Audit mode:** stop after the report; end with "run `/improve` again in execute mode to apply these."
+
+### Don't flatten creative intent
+
+Accessibility splits in two. The **floor is non-negotiable and never auto-skipped**: semantic elements, a visible focus state (any style), keyboard reachability, and contrast on text the user must *read or operate*. Always fix these.
+
+But low contrast, nonstandard interaction, or restraint on motion can be a **deliberate choice** on expressive surfaces — a moody hero, a faint watermark, decorative ghost text, an art-directed splash. There, don't auto-fix: **flag it as a tradeoff and ask**. "This hero is 2.8:1, below AA — intentional for the mood, or should I lift it?" Distinguish by role: is the element something the user *uses*, or something they *experience*? Fix the floor; flag the expressive choice.
+
+## The critique pass
+
+Don't just list checklist misses. Read the work a second time as a **hostile senior reviewer** and write down **five specific criticisms, each with a location** — `file:line` for code, screen + element for UI. "The table header and body are both 14px/500, so the header disappears" counts; "could be more polished" does not. Vague criticism is a no-op.
+
+This pass is **mode-scaled** — it does not double back on itself like the building loop in `frontend`:
+
+- **Audit mode:** the five located criticisms *are* the report. No fixing, no second pass — cheap by design.
+- **Execute mode:** one pass only — critique, fix all five, then verify (re-inspect / run). No forced repeat. This is an audit of presumably-working code, not a first draft; a second loop is build-time discipline that doesn't pay off here.
+
+## Seeing the UI
+
+For `ui`/`ux`, judge the rendered result — but spend tokens like they're scarce. A screenshot is an image: costly and slow. Reach for the cheapest tool that answers the question, in order:
+
+1. **Accessibility-tree / DOM-text snapshot** — Playwright's `ariaSnapshot` or Chrome DevTools' a11y snapshot. Plain text, a fraction of a screenshot's tokens. Answers most of it: hierarchy, labels, states, focus order, what's actually on the page.
+2. **One targeted screenshot** — only when the question is genuinely visual (spacing, contrast, alignment, overflow) and the tree can't show it. Capture the specific component, not the full page; one width, then a narrow width only if responsiveness is in question.
+3. **No renderer available?** Say so, read the markup, and reason about it at 360px and 1440px — don't pretend you looked.
+
+Use whichever MCP is connected (Chrome DevTools or Playwright); if neither, a small Playwright screenshot script. Don't screenshot what a text snapshot already told you.
 
 ## ui
 

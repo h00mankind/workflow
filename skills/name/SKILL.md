@@ -1,6 +1,6 @@
 ---
 name: name
-description: Generate and screen brand name candidates the way professional naming agencies do — across the full name-type taxonomy (descriptive, suggestive, invented, compound, portmanteau, acronym, palindrome, and more), screened on sound symbolism, pronounceability, and Abercrombie distinctiveness. Two modes — quick (no questions, ~20 candidates) and deep (a 5–10 question grill, then 100+ candidates down to a 20–30-name shortlist; the default). Always outputs an interactive HTML artifact of the whole candidate pool — naming matrix, filterable by type and metaphor, starrable into the user's own shortlist, with copy-as-markdown. Use whenever the user wants to name a company, product, feature, app, project, startup, or anything else; asks for "name ideas", "brand names", "what should I call this", a rebrand, or help picking between names they already have. Flags trademark and domain risks but is not legal clearance.
+description: Generate and screen brand name candidates the way professional naming agencies do — across the full name-type taxonomy (descriptive, suggestive, invented, compound, portmanteau, acronym, palindrome, and more), screened on sound symbolism, pronounceability, and Abercrombie distinctiveness. Two modes — quick (no questions, ~20 candidates) and deep (a 5–10 question grill, then 100+ candidates down to a 20–30-name shortlist; the default). Always outputs an interactive HTML artifact of the whole candidate pool — taxonomy coverage bar, filterable by type and metaphor, starrable into the user's own shortlist, with copy-as-markdown. Use whenever the user wants to name a company, product, feature, app, project, startup, or anything else; asks for "name ideas", "brand names", "what should I call this", a rebrand, or help picking between names they already have. Flags trademark and domain risks but is not legal clearance.
 ---
 
 # name
@@ -13,38 +13,32 @@ For deep dives — case studies, the legal doctrine in full, China/global naming
 
 ## Two modes — quick vs. deep
 
-Pick a mode first; it sets how much you ask and how much you generate.
+Same deliverable (the HTML artifact below); they differ only in how much you ask and how many candidates you generate.
 
-- **`deep` (default).** The full agency process: grill the user with **5–10 questions** to build a real brief, then generate **100+ candidates** across the taxonomy and screen down to a **20–30-name shortlist**. This is the default whenever the mode is ambiguous — naming is a serious exercise and the brief is where quality is won.
-- **`quick`.** Fast path: **ask nothing** (or at most one blocker question if the request is unworkable as-is), generate **~20 candidates** across the taxonomy with light screening, and hand back a **~20-name shortlist**. Use when the user wants speed.
+- **`deep` (default).** Grill the user with **5–10 questions**, generate **100+ candidates** across the taxonomy, screen down to a **20–30-name shortlist**. The brief is where quality is won, so this is the default whenever the mode is ambiguous.
+- **`quick`.** Ask nothing (at most one blocker question), generate **~20 candidates** with light screening, hand back a **~20-name shortlist**.
 
-**Choosing the mode:** honor an explicit `quick` / `deep` in the request. If neither is stated, infer from signal — a one-line "name my X" with little detail and a hurry-vibe → quick; a richer prompt, a real venture, or "help me name…" → deep. **When genuinely ambiguous, default to deep**, and say so in one line ("Running in deep mode — I'll ask a few questions first; say *quick* if you'd rather I just generate"). The user can switch modes at any time.
-
-Both modes produce the **same kind of deliverable** (the HTML artifact below) — they differ in how much you ask and how many candidates you generate.
+Honor an explicit `quick` / `deep`. Otherwise infer from signal — terse "name my X" with a hurry-vibe → quick; a richer prompt or real venture → deep. When genuinely ambiguous, default to deep and say so in one line ("Running in deep mode — I'll ask a few questions first; say *quick* to skip"). The user can switch anytime.
 
 ## Step 1 — Get a brief
 
-The quality of the names is set here, not in generation. How much you ask depends on the mode.
+The quality of the names is set here, not in generation.
 
-### Deep mode — grill the user (5–10 questions)
+**Deep mode — grill (5–10 questions).** Batch them (`AskUserQuestion` takes 4 at once, so 2–3 rounds). Don't ask what the prompt already answers; spend questions on what shapes the name:
 
-Build a real brief. Ask **5–10 questions** before generating — prefer batching them (the `AskUserQuestion` tool takes up to 4 at once, so 2–3 rounds). Don't ask what the prompt already answers; spend the questions on what's missing and what shapes the name. Draw from:
+- **What is it?** One sentence on what it does and what makes it different.
+- **Vibe.** Playful/serious, premium/accessible, warm/sharp — what feeling on first hearing?
+- **Audience.** Who's it for, and what do they call this category today?
+- **Competitors.** Name 3–5 — you'll name deliberately *away* from their pattern.
+- **Architecture.** Standalone, or under a parent? Need sub-brands later (extendability)?
+- **Forbidden territory.** Words/themes that must appear, must be avoided, or that competitors own. Founder vetoes?
+- **Language.** English-only or cross-language? Cultural markets to respect (`reference.md` §6, §10)?
+- **Constraints.** One market or global? Domain flexibility (.com required, or .ai/.io/.co fine)? TM classes that matter?
+- **Reaction appetite.** Safe-and-clear, or open to a polarizing name? (Calibrates how far up the taxonomy to push.)
 
-- **What is it, exactly?** One sentence on what the thing does and what makes it different.
-- **Positioning / vibe.** Playful or serious? Premium or accessible? Bold or trustworthy? Warm or sharp? What feeling should it trigger on first hearing?
-- **Audience.** Who's it for — demographics, sophistication, region? What do they call this category today?
-- **Competitors.** Name 3–5. You'll plot them and name deliberately *away* from their cluster.
-- **Name architecture.** Standalone brand, or sits under a parent? Will it need sub-brands / product names later (extendability)?
-- **Tone & forbidden territory.** Words/themes that must appear, must be avoided, or that competitors own. Any founder favorites or vetoes?
-- **Register / language.** English-only, or should it work across languages? Any cultural markets to respect (see `reference.md` §6, §10)?
-- **Scope & constraints.** Global or one market? Domain/TLD flexibility (.com required, or .ai/.io/.co fine)? Trademark classes that matter?
-- **Reaction appetite.** Do they want safe-and-clear, or are they open to a polarizing, distinctive name? (This calibrates how far up the taxonomy you push.)
+Reflect the brief back in a sentence before generating, so the user can correct course cheaply.
 
-Reflect the brief back in a sentence or two before generating, so the user can correct course cheaply.
-
-### Quick mode — skip the grill
-
-Don't interrogate. Generate from whatever the user gave you and **state your assumptions** inline. Ask **at most one** question, and only if the request is genuinely unworkable without it (e.g. you don't even know what the product is). Otherwise infer vibe, audience, and category from context and move straight to generation.
+**Quick mode — skip the grill.** Generate from what you were given and **state your assumptions inline**. Ask at most one question, only if the request is unworkable without it (e.g. you don't know what the product is).
 
 ## Step 2 — Generate broad, across the taxonomy
 
@@ -111,33 +105,46 @@ Run candidates through these screens. The first pass kills the obvious losers; r
 
 ## Step 4 — Shortlist with rationale
 
-Don't just dump a list. Return a shortlist — **20–30 survivors in deep mode, ~20 in quick** — grouped by type (cover the range — don't let one type dominate the shortlist), each with: the name, its type, a one-line "why it works," its sound-symbolism read, syllable count, Abercrombie tier, and any risk flag. Then call out your **top 3–5 picks** with a sentence each on why they're strongest against the brief.
+Return a shortlist — **20–30 survivors in deep, ~20 in quick** — grouped by type so the range shows (don't let one type dominate). Each survivor carries six fields, plus a flag when relevant:
 
-**A note on reactions:** the right name is often *polarizing*, not instantly-loved. Andy Grove on "Pentium": "I see the polarization here … that tells me there's energy." If the user's team unanimously loves one on first hearing, it may just be the comfortable, category-typical choice. Don't optimize for the safe favorite.
+> **Vellum** · Lexical/arbitrary · *Old translucent drawing surface — sketches + text, tactile and premium.* · sound: velvet-soft, calm · 2 syl · Arbitrary tier · ⚠ a Sketch font is named Vellum — check the TM class.
+
+Then call out your **top 3–5 picks**, one sentence each on why they're strongest against the brief.
+
+**On reactions:** the right name is often *polarizing*, not instantly-loved. Andy Grove on "Pentium": "I see the polarization here … that tells me there's energy." Unanimous first-hearing love often just means the comfortable, category-typical choice. Don't optimize for the safe favorite.
 
 ## Output format
 
-**Always produce an HTML artifact** — in both modes. A naming result is inherently spatial *and* interactive: the user wants to compare candidates, filter, and curate their own shortlist. So the artifact isn't a static report — it's a **triage interface** the user drives. Build:
+**Always produce an HTML artifact**, both modes — a **triage interface** the user compares, filters, and curates, not a report. Don't rebuild it from scratch: **start from `template.html` in this skill folder.** It already implements the layout, the AND filters, the single-`Set` state, the sticky shortlist rail, and the clipboard/verification logic — the parts that get re-derived wrong on a blank page.
 
-- a **naming matrix** (e.g. Descriptive↔Abstract × Real↔Coined, or axes tailored to the brief) with **every candidate plotted** (recommended ones as larger dots, the rest smaller), and the category/competitor cluster drawn as a zone to name *away* from;
-- **the whole pool, all of it visible** — never just the shortlist. This is the #1 thing to get right: if you generated 100, the artifact must show 100. Use a **two-tier layout** so the page stays scannable:
-  - the **recommended set** (deep: ~20–30; quick: the ~20) as full **score cards** — name, type, why, sound read, syllable count, Abercrombie tier, risk flag;
-  - **the rest of the pool** as **compact chips** below — name + (root/gloss) + type + a star — grouped by name-type. Don't bury this in a collapsed `<details>`; it's the thing the user picks from. (Quick mode's ~20 can be all full cards with no chip tier.)
-- **two independent filter rows that combine (AND):** one for **name-type** (a button per taxonomy type present) and one for **metaphor/theme** (the brief's angles). Both apply to the cards *and* the chips, plus a "clear filters" reset. Don't ship a single vague filter.
+```
+┌─────────────────────────────────────────────────┬────────┐
+│  HEADER  project · brief in one line · mode      │        │
+├─────────────────────────────────────────────────┤  SHORT │
+│  1  COVERAGE BAR  per-type counts, click to filter│  LIST  │
+│  2  FILTERS       [type] · [metaphor] · clear     │  PANEL │
+│  3  RECOMMENDED    score cards, grouped by type   │ (right │
+│  4  THE POOL       compact chips (deep only)      │  rail) │
+├─────────────────────────────────────────────────┴────────┤
+│  FOOTER  path · how to copy out                           │
+└───────────────────────────────────────────────────────────┘
+```
 
-**Interactive shortlisting (required).** Every candidate — full card *or* compact chip — has a **star / checkbox** to add or remove it from *the user's* shortlist. The shortlist you screened to is just the **default starred set** — the user overrides it by starring/unstarring anything in the pool. Wire up:
+### Fill the template
 
-- a **live shortlist panel** (a sticky sidebar or header bar) that updates the instant a card is toggled, showing the current picks and a count;
-- a **Reset** button that restores the default starred set (your recommended shortlist);
-- a **Copy** button that **copies the user's current shortlist to the clipboard as markdown** — name, type, why, and flag per pick — so it pastes straight back into a prompt. Label it "Copy", not "Save": it copies to the clipboard, it does not persist. (`localStorage` throws in sandboxed-iframe artifacts anyway, so keep all selection state in JS variables for the session; the user copies out before closing.) **Always `.catch` the `navigator.clipboard.writeText` promise** — it rejects with `NotAllowedError` under `file://` and in some sandboxes; on failure, show a "copy failed" toast rather than failing silently. Disable Copy when the shortlist is empty.
+1. **Inject the data.** Replace `BRIEF` (project, one-line brief, `mode`, absolute path) and `CANDIDATES` with your real pool. Each candidate: `{ id, name, type, metaphor, gloss, sound, syllables, tier, flag, rec }`. Set `rec: true` for your recommended shortlist — those start starred and render as cards; the rest fall to the pool tier. Quick mode (`mode: "quick"`) auto-hides the pool, so mark all ~20 `rec: true`.
+2. **Retheme, don't restructure.** Per the /html skill, the artifact's personality should fit the *subject* — retheme the `:root` tokens (a finance tool ≠ a kids' app). Keep the layout and JS engine; restyle freely. Don't reach for the generic AI look (Inter + purple gradient).
+3. **Save & report.** One self-contained file to `<repo-root>/docs/html/` in a git repo (create if missing), else `~/Downloads/`. Report the absolute path and an open command. Only drop to plain markdown if the user explicitly asks for no artifact.
 
-Keep selection state in a plain JS structure (e.g. a `Set` of candidate ids); the star buttons, the live panel, the count, Reset, and Copy all read from a single `render()` that re-derives everything from that Set. No browser storage.
+### Before handoff — verify
 
-**Before handing it over, verify the wiring** (the two bugs that bite: only the shortlist renders instead of the whole pool, and Copy fails silently). Confirm the candidate count on the page equals what you generated, that starring a chip *and* a card both update the live panel + count, that Reset restores the default set, and that the type×metaphor filters combine. If you have a browser tool available, drive it; otherwise read back the rendered counts.
+The template's own header comment lists how to fill it; these are the behaviors to confirm after you do. Drive a browser tool if available; otherwise read back the counts.
 
-**Artifact mechanics:** one self-contained file — inline CSS/JS, opens by double-click, no browser storage — with overflow guardrails so long names can't break the layout, and its own personality/theme. Save to `<repo-root>/docs/html/` when in a git repo (create it), otherwise `~/Downloads/`. End by reporting the absolute path and an open command.
-
-Only drop to plain markdown if the user explicitly asks for a chat answer / no artifact.
+1. Rendered candidate count equals what you generated (the classic bug: only the shortlist renders, or the pool tier collapses).
+2. Starring from a card *and* from a pool chip both update the rail count.
+3. **Reset** restores the default starred set; **Clear** resets the filters.
+4. Type + metaphor filters intersect (AND); the coverage bar counts sum to the full pool.
+5. **Copy** writes markdown and fails loudly (the template already `.catch`es the clipboard reject).
 
 ## When to recommend a rebrand vs. keep
 

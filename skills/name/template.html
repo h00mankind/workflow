@@ -1,0 +1,364 @@
+<!doctype html>
+<!--
+  name skill — naming triage interface template.
+  HOW TO USE (agent):
+    1. Replace BRIEF and CANDIDATES below. Leave everything else alone.
+    2. Set each candidate's `rec: true` for your recommended shortlist (they start starred).
+    3. Theme it per the /html skill — retheme the :root tokens to fit the *subject*
+       (a finance tool ≠ a kids' app). Keep the layout and JS; restyle freely.
+    4. Run the 6-point check at the bottom of SKILL.md before handoff.
+  The structure, filters, single-Set state, and clipboard logic are done. Don't rebuild them.
+-->
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Names · {{PROJECT}}</title>
+<style>
+  /* ---- THEME TOKENS — retheme these per /html to fit the subject ---- */
+  :root {
+    --bg: #0f1115; --surface: #171a21; --surface-2: #1d212a; --border: #2a2f3a;
+    --text: #e6e9ef; --muted: #9aa3b2; --faint: #6b7280;
+    --accent: #7c9cff; --accent-soft: #7c9cff22; --star: #ffc857;
+    --flag: #ff6b6b; --flag-soft: #ff6b6b1a;
+    --radius: 10px; --space-1: 4px; --space-2: 8px; --space-3: 12px;
+    --space-4: 16px; --space-5: 24px; --space-6: 32px;
+    --font: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    --mono: ui-monospace, "SF Mono", "JetBrains Mono", Menlo, monospace;
+    --rail-w: 264px;
+  }
+  [data-theme="light"] {
+    --bg: #f6f7f9; --surface: #fff; --surface-2: #f0f2f5; --border: #dfe3ea;
+    --text: #1a1d24; --muted: #5a6472; --faint: #98a1b0; --accent-soft: #7c9cff1f;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--text);
+    font-family: var(--font); font-size: 14px; line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+  }
+  a { color: var(--accent); }
+  .wrap { max-width: 1240px; margin: 0 auto; padding: var(--space-5); }
+
+  /* HEADER — outside the grid */
+  header.page { display: flex; align-items: baseline; gap: var(--space-4); flex-wrap: wrap; margin-bottom: var(--space-5); }
+  header.page h1 { font-size: 20px; margin: 0; letter-spacing: -0.01em; }
+  header.page .brief { color: var(--muted); flex: 1 1 320px; min-width: 0; }
+  header.page .mode { font-family: var(--mono); font-size: 12px; color: var(--faint); text-transform: uppercase; letter-spacing: 0.04em; }
+  .theme-toggle { background: var(--surface-2); border: 1px solid var(--border); color: var(--muted); border-radius: var(--radius); padding: var(--space-1) var(--space-3); cursor: pointer; font-size: 12px; }
+
+  /* GRID — main + sticky rail */
+  .layout { display: grid; grid-template-columns: 1fr var(--rail-w); gap: var(--space-5); align-items: start; }
+  @media (max-width: 960px) { .layout { grid-template-columns: 1fr; } .rail { display: none; } }
+
+  section.block { margin-bottom: var(--space-6); }
+  h2.lbl { font-size: 12px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--faint); margin: 0 0 var(--space-3); }
+
+  /* 1 — COVERAGE BAR */
+  .coverage { display: flex; flex-direction: column; gap: var(--space-2); }
+  .cov-row { display: grid; grid-template-columns: 130px 1fr 34px; align-items: center; gap: var(--space-3); cursor: pointer; background: none; border: 0; color: inherit; font: inherit; text-align: left; padding: 0; }
+  .cov-row .nm { color: var(--muted); font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .cov-row .track { background: var(--surface-2); border-radius: 6px; height: 14px; overflow: hidden; }
+  .cov-row .fill { background: var(--accent); height: 100%; border-radius: 6px; }
+  .cov-row .ct { font-family: var(--mono); font-size: 12px; color: var(--faint); text-align: right; }
+  .cov-row[aria-pressed="true"] .nm { color: var(--text); font-weight: 600; }
+  .cov-row.dim { opacity: 0.35; }
+
+  /* 2 — FILTERS */
+  .filters { display: flex; flex-direction: column; gap: var(--space-2); }
+  .filter-row { display: flex; flex-wrap: wrap; gap: var(--space-2); align-items: center; }
+  .filter-row .cap { font-size: 11px; color: var(--faint); text-transform: uppercase; letter-spacing: 0.05em; margin-right: var(--space-2); }
+  .chip-btn { background: var(--surface-2); border: 1px solid var(--border); color: var(--muted); border-radius: 999px; padding: var(--space-1) var(--space-3); cursor: pointer; font-size: 12px; }
+  .chip-btn[aria-pressed="true"] { background: var(--accent-soft); border-color: var(--accent); color: var(--text); }
+  .clear-btn { background: none; border: 0; color: var(--accent); cursor: pointer; font-size: 12px; padding: var(--space-1) var(--space-2); }
+
+  /* 3 — RECOMMENDED CARDS */
+  .type-group { margin-bottom: var(--space-4); }
+  .type-group > .type-lbl { font-size: 11px; color: var(--faint); text-transform: uppercase; letter-spacing: 0.05em; margin: 0 0 var(--space-2); }
+  .cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: var(--space-3); }
+  .card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: var(--space-3) var(--space-4); position: relative; }
+  .card .nm { font-size: 16px; font-weight: 650; letter-spacing: -0.01em; overflow-wrap: anywhere; }
+  .card .why { color: var(--muted); margin: var(--space-1) 0 var(--space-2); }
+  .card .meta { display: flex; flex-wrap: wrap; gap: var(--space-1) var(--space-3); font-size: 11px; color: var(--faint); font-family: var(--mono); }
+  .card .flag { display: block; margin-top: var(--space-2); font-size: 11px; color: var(--flag); background: var(--flag-soft); border-radius: 6px; padding: var(--space-1) var(--space-2); }
+  .star { position: absolute; top: var(--space-2); right: var(--space-2); background: none; border: 0; cursor: pointer; font-size: 16px; line-height: 1; color: var(--faint); padding: var(--space-1); }
+  .star[aria-pressed="true"] { color: var(--star); }
+
+  /* 4 — THE POOL (chips) */
+  .pool { display: flex; flex-wrap: wrap; gap: var(--space-2); }
+  .pchip { display: inline-flex; align-items: center; gap: var(--space-2); background: var(--surface); border: 1px solid var(--border); border-radius: 999px; padding: var(--space-1) var(--space-2) var(--space-1) var(--space-3); font-size: 12px; max-width: 100%; }
+  .pchip .pnm { font-weight: 600; overflow-wrap: anywhere; }
+  .pchip .pgl { color: var(--faint); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 160px; }
+  .pchip .star { position: static; font-size: 13px; }
+  .hidden { display: none !important; }
+
+  /* RAIL — sticky shortlist */
+  .rail { position: sticky; top: var(--space-5); background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: var(--space-4); }
+  .rail h2 { font-size: 13px; margin: 0 0 var(--space-1); }
+  .rail .count { font-family: var(--mono); font-size: 12px; color: var(--muted); margin-bottom: var(--space-3); }
+  .rail .picks { display: flex; flex-direction: column; gap: var(--space-1); max-height: 52vh; overflow: auto; margin-bottom: var(--space-3); }
+  .rail .pick { display: flex; justify-content: space-between; gap: var(--space-2); font-size: 13px; padding: var(--space-1) 0; }
+  .rail .pick .ptype { color: var(--faint); font-size: 11px; font-family: var(--mono); }
+  .rail .actions { display: flex; gap: var(--space-2); }
+  .rail .actions button { flex: 1; border-radius: var(--radius); padding: var(--space-2); cursor: pointer; font-size: 12px; border: 1px solid var(--border); }
+  .rail .reset { background: var(--surface-2); color: var(--muted); }
+  .rail .copy { background: var(--accent); color: #0b0d12; border-color: var(--accent); font-weight: 600; }
+  .rail .copy:disabled { opacity: 0.4; cursor: not-allowed; }
+  .rail .empty { color: var(--faint); font-size: 12px; }
+
+  /* floating pill (mobile) */
+  .pill { display: none; position: fixed; bottom: var(--space-4); right: var(--space-4); background: var(--accent); color: #0b0d12; border: 0; border-radius: 999px; padding: var(--space-3) var(--space-5); font-weight: 600; cursor: pointer; box-shadow: 0 6px 24px #0006; z-index: 20; }
+  @media (max-width: 960px) { .pill { display: block; } }
+
+  footer.page { color: var(--faint); font-size: 12px; margin-top: var(--space-6); border-top: 1px solid var(--border); padding-top: var(--space-4); }
+  footer.page code { font-family: var(--mono); color: var(--muted); }
+
+  .toast { position: fixed; bottom: var(--space-5); left: 50%; transform: translateX(-50%); background: var(--surface-2); border: 1px solid var(--border); color: var(--text); border-radius: var(--radius); padding: var(--space-2) var(--space-4); font-size: 13px; opacity: 0; transition: opacity 0.2s; pointer-events: none; z-index: 30; }
+  .toast.show { opacity: 1; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="page">
+    <h1 id="title">Names</h1>
+    <div class="brief" id="brief"></div>
+    <span class="mode" id="mode"></span>
+    <button class="theme-toggle" onclick="document.documentElement.dataset.theme = document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark'">theme</button>
+  </header>
+
+  <div class="layout">
+    <main>
+      <section class="block" id="coverageBlock">
+        <h2 class="lbl">Coverage — candidates by type</h2>
+        <div class="coverage" id="coverage"></div>
+      </section>
+
+      <section class="block">
+        <h2 class="lbl">Filter</h2>
+        <div class="filters">
+          <div class="filter-row" id="typeFilters"><span class="cap">Type</span></div>
+          <div class="filter-row" id="metaFilters"><span class="cap">Theme</span></div>
+          <div class="filter-row"><button class="clear-btn" id="clearBtn">Clear filters</button></div>
+        </div>
+      </section>
+
+      <section class="block">
+        <h2 class="lbl">Recommended</h2>
+        <div id="recommended"></div>
+      </section>
+
+      <section class="block" id="poolBlock">
+        <h2 class="lbl">The pool</h2>
+        <div class="pool" id="pool"></div>
+      </section>
+    </main>
+
+    <aside class="rail">
+      <h2>Shortlist</h2>
+      <div class="count" id="railCount">0 of 0</div>
+      <div class="picks" id="railPicks"></div>
+      <div class="actions">
+        <button class="reset" id="resetBtn">Reset</button>
+        <button class="copy" id="copyBtn">Copy</button>
+      </div>
+    </aside>
+  </div>
+
+  <footer class="page">
+    <span id="footPath"></span> · Star to curate · <strong>Copy</strong> exports the shortlist as markdown.
+  </footer>
+</div>
+
+<button class="pill" id="pill">Shortlist (0)</button>
+<div class="toast" id="toast"></div>
+
+<script>
+/* ============================================================
+   INJECT YOUR DATA HERE — replace BRIEF and CANDIDATES only.
+   Candidate shape:
+     { id, name, type, metaphor, gloss, sound, syllables, tier, flag, rec }
+   - type:      taxonomy type label (groups cards + coverage bar)
+   - metaphor:  theme/angle from the brief (drives the Theme filter); "" if none
+   - gloss:     short meaning/why (one line)
+   - sound:     sound read, e.g. "velvet-soft, calm"
+   - syllables: number
+   - tier:      Abercrombie tier ("Arbitrary", "Fanciful", …)
+   - flag:      risk string or "" — shown as a warning chip
+   - rec:       true => in the recommended set => starts starred + shown as a card
+   ============================================================ */
+const BRIEF = {
+  project: "{{PROJECT}}",
+  line: "{{ONE-LINE BRIEF}}",
+  mode: "deep",            // "deep" | "quick"  (quick: rec-only, no pool tier)
+  path: "{{ABSOLUTE PATH}}"
+};
+const CANDIDATES = [
+  // EXAMPLE ROWS — delete and replace.
+  { id: 1, name: "Vellum", type: "Lexical/arbitrary", metaphor: "tactile/premium", gloss: "Old translucent drawing surface — tactile, premium.", sound: "velvet-soft, calm", syllables: 2, tier: "Arbitrary", flag: "A Sketch font is named Vellum — check the TM class.", rec: true },
+  { id: 2, name: "Slate", type: "Lexical/arbitrary", metaphor: "tactile/premium", gloss: "Clean surface to start on.", sound: "flat, grounded", syllables: 1, tier: "Arbitrary", flag: "", rec: true },
+  { id: 3, name: "Inkwell", type: "Compound", metaphor: "writing", gloss: "Source of ink — where words come from.", sound: "soft open, warm", syllables: 2, tier: "Suggestive", flag: "", rec: false },
+];
+/* ============================================================
+   Below this line is the engine — do not rebuild it per run.
+   ============================================================ */
+
+const $ = (s, r = document) => r.querySelector(s);
+const byType = (arr) => {
+  const m = new Map();
+  for (const c of arr) { if (!m.has(c.type)) m.set(c.type, []); m.get(c.type).push(c); }
+  return [...m.entries()];
+};
+
+// SINGLE SOURCE OF TRUTH: one Set of starred ids.
+const DEFAULT_STARRED = CANDIDATES.filter(c => c.rec).map(c => c.id);
+const starred = new Set(DEFAULT_STARRED);
+const activeTypes = new Set();
+const activeMetas = new Set();
+
+const recs = CANDIDATES.filter(c => c.rec);
+const pool = CANDIDATES.filter(c => !c.rec);
+const allTypes = [...new Set(CANDIDATES.map(c => c.type))];
+const allMetas = [...new Set(CANDIDATES.map(c => c.metaphor).filter(Boolean))];
+const isQuick = BRIEF.mode === "quick";
+
+function matches(c) {
+  const t = activeTypes.size === 0 || activeTypes.has(c.type);
+  const m = activeMetas.size === 0 || activeMetas.has(c.metaphor);
+  return t && m;
+}
+
+function buildStatic() {
+  $("#title").textContent = "Names · " + BRIEF.project;
+  document.title = "Names · " + BRIEF.project;
+  $("#brief").textContent = BRIEF.line;
+  $("#mode").textContent = BRIEF.mode + " mode";
+  $("#footPath").innerHTML = "<code>" + BRIEF.path + "</code>";
+  if (isQuick) $("#poolBlock").classList.add("hidden");
+
+  // type filter buttons
+  const tf = $("#typeFilters");
+  allTypes.forEach(t => {
+    const b = document.createElement("button");
+    b.className = "chip-btn"; b.textContent = t; b.setAttribute("aria-pressed", "false");
+    b.onclick = () => { toggle(activeTypes, t); render(); };
+    b.dataset.type = t; tf.appendChild(b);
+  });
+  // metaphor filter buttons
+  const mf = $("#metaFilters");
+  if (allMetas.length === 0) mf.classList.add("hidden");
+  allMetas.forEach(m => {
+    const b = document.createElement("button");
+    b.className = "chip-btn"; b.textContent = m; b.setAttribute("aria-pressed", "false");
+    b.onclick = () => { toggle(activeMetas, m); render(); };
+    b.dataset.meta = m; mf.appendChild(b);
+  });
+}
+const toggle = (set, v) => set.has(v) ? set.delete(v) : set.add(v);
+
+function starButton(c) {
+  const b = document.createElement("button");
+  b.className = "star"; b.setAttribute("aria-pressed", starred.has(c.id));
+  b.setAttribute("aria-label", "Star " + c.name); b.textContent = starred.has(c.id) ? "★" : "☆";
+  b.onclick = (e) => { e.stopPropagation(); toggle(starred, c.id); render(); };
+  return b;
+}
+
+function render() {
+  const counts = {};
+  CANDIDATES.forEach(c => counts[c.type] = (counts[c.type] || 0) + 1);
+  const maxCt = Math.max(...Object.values(counts));
+
+  // 1 — coverage bar
+  const cov = $("#coverage"); cov.innerHTML = "";
+  Object.entries(counts).sort((a, b) => b[1] - a[1]).forEach(([type, ct]) => {
+    const on = activeTypes.has(type);
+    const row = document.createElement("button");
+    row.className = "cov-row" + (activeTypes.size && !on ? " dim" : "");
+    row.setAttribute("aria-pressed", on);
+    row.innerHTML = `<span class="nm">${type}</span><span class="track"><span class="fill" style="width:${(ct / maxCt * 100).toFixed(1)}%"></span></span><span class="ct">${ct}</span>`;
+    row.onclick = () => { toggle(activeTypes, type); render(); };
+    cov.appendChild(row);
+  });
+
+  // sync filter button states
+  document.querySelectorAll("#typeFilters .chip-btn").forEach(b => b.setAttribute("aria-pressed", activeTypes.has(b.dataset.type)));
+  document.querySelectorAll("#metaFilters .chip-btn").forEach(b => b.setAttribute("aria-pressed", activeMetas.has(b.dataset.meta)));
+
+  // 3 — recommended cards, grouped by type
+  const rc = $("#recommended"); rc.innerHTML = "";
+  byType(recs.filter(matches)).forEach(([type, list]) => {
+    const g = document.createElement("div"); g.className = "type-group";
+    g.innerHTML = `<p class="type-lbl">${type}</p>`;
+    const grid = document.createElement("div"); grid.className = "cards";
+    list.forEach(c => {
+      const card = document.createElement("div"); card.className = "card";
+      card.innerHTML = `<div class="nm">${c.name}</div><div class="why">${c.gloss}</div>` +
+        `<div class="meta"><span>${c.sound}</span><span>${c.syllables} syl</span><span>${c.tier}</span></div>` +
+        (c.flag ? `<span class="flag">⚠ ${c.flag}</span>` : "");
+      card.appendChild(starButton(c));
+      grid.appendChild(card);
+    });
+    g.appendChild(grid); rc.appendChild(g);
+  });
+
+  // 4 — pool chips (deep only)
+  if (!isQuick) {
+    const pl = $("#pool"); pl.innerHTML = "";
+    byType(pool.filter(matches)).forEach(([type, list]) => {
+      list.forEach(c => {
+        const chip = document.createElement("span"); chip.className = "pchip";
+        chip.innerHTML = `<span class="pnm">${c.name}</span>` + (c.gloss ? `<span class="pgl">${c.gloss}</span>` : "");
+        chip.appendChild(starButton(c));
+        pl.appendChild(chip);
+      });
+    });
+  }
+
+  // rail / shortlist
+  const picked = CANDIDATES.filter(c => starred.has(c.id));
+  $("#railCount").textContent = `${picked.length} of ${CANDIDATES.length}`;
+  const rp = $("#railPicks");
+  if (picked.length === 0) rp.innerHTML = `<div class="empty">Nothing starred yet.</div>`;
+  else {
+    rp.innerHTML = "";
+    picked.forEach(c => {
+      const row = document.createElement("div"); row.className = "pick";
+      row.innerHTML = `<span>${c.name}</span><span class="ptype">${c.type}</span>`;
+      rp.appendChild(row);
+    });
+  }
+  $("#copyBtn").disabled = picked.length === 0;
+  $("#pill").textContent = `Shortlist (${picked.length})`;
+}
+
+function shortlistMarkdown() {
+  const picked = CANDIDATES.filter(c => starred.has(c.id));
+  let md = `# ${BRIEF.project} — shortlist\n\n_${BRIEF.line}_\n\n`;
+  byType(picked).forEach(([type, list]) => {
+    md += `## ${type}\n`;
+    list.forEach(c => { md += `- **${c.name}** — ${c.gloss} (${c.sound}, ${c.syllables} syl, ${c.tier})${c.flag ? ` ⚠ ${c.flag}` : ""}\n`; });
+    md += "\n";
+  });
+  return md;
+}
+
+function toast(msg) {
+  const t = $("#toast"); t.textContent = msg; t.classList.add("show");
+  setTimeout(() => t.classList.remove("show"), 1800);
+}
+
+// wire actions
+$("#clearBtn").onclick = () => { activeTypes.clear(); activeMetas.clear(); render(); };
+$("#resetBtn").onclick = () => { starred.clear(); DEFAULT_STARRED.forEach(id => starred.add(id)); render(); };
+$("#copyBtn").onclick = () => {
+  navigator.clipboard.writeText(shortlistMarkdown())
+    .then(() => toast("Shortlist copied"))
+    .catch(() => toast("Copy failed — select the page text manually"));
+};
+$("#pill").onclick = () => $(".rail").scrollIntoView({ behavior: "smooth" });
+
+buildStatic();
+render();
+</script>
+</body>
+</html>

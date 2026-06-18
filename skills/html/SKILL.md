@@ -21,10 +21,22 @@ Reach for HTML when at least one is true; otherwise stay in chat:
 
 No shared stylesheet; the subject dictates the look. A post-mortem reads like a serious report (restrained, near-monochrome, one alarm color); an architecture map like a blueprint (monospace labels, thin rules); an explainer editorial (serif headings, generous measure); a triage board like a tool (dense, utilitarian).
 
-- Define a small token set inline — 6–10 CSS custom properties in `:root` (background, text, muted, accent, border, radius, fonts, a spacing unit) — and use them throughout. Consistent within the artifact, varied across artifacts.
-- One or two font families max — a system stack or a single Google Fonts link chosen for the personality.
-- Light or dark by content, not habit. A theme toggle is optional; if included, flip a `data-theme` attribute — no browser storage.
-- Refuse the default AI look: Inter + purple gradient + identical rounded cards is a non-choice.
+- Define a token set inline in `:root` and a `[data-theme="dark"]` override — colors (`--bg`, `--text`, `--muted`, `--border`, `--card`, `--accent`), radius, fonts, and the spacing scale. Use them throughout. Consistent within the artifact, varied across artifacts. (Scale, theme switcher, icons, TOC, guardrails: `snippets.md` — paste-in plumbing, no need to re-derive it.)
+- One sans + one mono, sometimes one serif. Pick by content, not habit:
+  - **Tools, maps, dashboards, code review** — sans + mono, tight tracking. Reads technical.
+  - **Reports, post-mortems, status** — humanist sans + mono, neutral tracking. Reads institutional.
+  - **Explainers, research, learning** — serif headings + sans body, generous measure. Reads editorial.
+  - **Decks, hero pages** — display serif headings + sans body. Reads designed.
+- Refuse the default AI look: Inter + purple gradient + identical rounded cards is a non-choice. A clean technical pairing is fine — just don't reach for it by reflex.
+- **Icons: a library, never unicode glyphs** (`★`, `⚠`, `→` render inconsistently and look like placeholder). Default Remix Icon — a webfont, one CSS link, no JS init. See `snippets.md`.
+
+## Plumbing — paste from `snippets.md`
+
+These parts are identical every run and carry no personality, so don't re-derive them — copy from `snippets.md` and theme the tokens to fit:
+
+- **Spacing scale** — pick a scale, not arithmetic; set once in `:root`, use everywhere. No stray pixel/em spacing — a single `3px` in the wrong place is the fastest tell of a sloppy artifact.
+- **Theme switcher** — if the artifact is returned to or read in different lighting, ship both themes (default by content), text-label button, no storage, respect `prefers-color-scheme`.
+- **Right-side TOC + scrollspy** — for 3+ `<h2>` sections. The two traps the bundle handles: header/footer outside the grid (or the rule strands next to the TOC), and the per-item tick spacing on the `<li>` not the link (or the ticks merge into one rail).
 
 ## Constraints
 
@@ -44,16 +56,7 @@ Filename: kebab-case slug from the request, no timestamp. Always end the turn wi
 
 ## Layout guardrails
 
-Long URLs and shell one-liners will eventually punch out of cards and table cells. Always include:
-
-```css
-:not(pre) > code { overflow-wrap: anywhere; word-break: break-word; }  /* inline code wraps */
-pre { overflow-x: auto; max-width: 100%; }                              /* block code scrolls */
-pre code { overflow-wrap: normal; word-break: normal; white-space: pre; }
-.card, .sidebar, .grid > * { min-width: 0; }                            /* flex/grid children can shrink */
-```
-
-If there's a sidebar TOC with scrollspy: wrap each `<h2>` + its content in a `<section id>`, observe the **sections** with an `IntersectionObserver` (`threshold: [0, .25, .5, .75, 1]`), and highlight the section with the **largest visible area**. Don't observe bare headings with a tight `rootMargin` — it flips the active link to the next section while the reader is still mid-way through the previous one.
+Long URLs and shell one-liners eventually punch out of cards and table cells — always include the wrap/scroll/`min-width:0` guardrail CSS from `snippets.md`. The scrollspy JS (observe sections, highlight the largest-visible) lives there too.
 
 ## The catalog
 
