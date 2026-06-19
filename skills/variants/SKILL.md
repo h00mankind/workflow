@@ -28,6 +28,7 @@ The first one or two variants come easy because you've built them before. To rea
 - **Remove or add a constraint** — what if this needed no screen at all? What if it happened automatically? (Manual photo-backup → auto-backup everything: the interface disappears.)
 - **Blend from another domain** — what if this were a game? A physical product? What would Muji ship?
 - **Invert the problem** — instead of helping users pick what they want, help them rule out what they don't.
+- **Max one facet** — design a variant that's 10/10 on a single quality (speed, trust, delight, accessibility) and let that one obsession distort everything else.
 - **Force a count** — commit to 5 (or 12) directions before judging any; the back half is where the surprises live.
 
 Name each variant after its direction (`auto`, `slider`, `gamified`), never "Option A/B/C". If you can't tell two apart in one sentence, they're the same idea — drop one and push harder.
