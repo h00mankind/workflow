@@ -48,7 +48,7 @@ Verdict with reasoning — `validated`, `parked`, or `dead` — recorded in a `#
 
 ## Prototype
 
-A prototype is **throwaway code that answers a question** — usually the idea's riskiest assumption. Write the question as a comment at the top; if you can't state it in one sentence, validate first. Prototypes answer logic questions; "what should it look like?" is a design-variations exercise (the `variations` skill), not a prototype.
+A prototype is **throwaway code that answers a question** — usually the idea's riskiest assumption. Write the question as a comment at the top; if you can't state it in one sentence, validate first. Prototypes answer logic questions; "what should it look like?" is a design-variants exercise (the `variants` skill), not a prototype.
 
 1. **Throwaway from day one.** A `prototypes/` folder or `proto-` prefix — nobody mistakes it for production.
 2. **One command to run**, using whatever runner the project already has.

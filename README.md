@@ -16,7 +16,7 @@ My personal Claude Code skills.
 From idea to shipped, each step a skill:
 
 - `skills/idea/` — Capture, list, validate, and prototype ideas in `docs/ideas/` with a status lifecycle (spark → validated → building → parked → dead). Capture ends by offering a throwaway prototype of the idea's riskiest assumption.
-- `skills/variations/` — 3–5 radically different takes on a component or UX flow, all on one route with a switcher.
+- `skills/variants/` — 3–5 structurally different takes on a component or UX flow, all on one route with a switcher. Pushes for conceptual range (remove a constraint, blend domains, invert the problem), not restyles of one idea.
 - `skills/plan/` — PRD in `docs/plans/` plus tracer-bullet vertical-slice issues (optionally filed via `gh`). Two modes: `grill` (one-question-at-a-time interview first) or `trust` (no questions, synthesize and deliver). Maintains the knowledge base as it goes: a domain glossary in `docs/CONTEXT.md` and decision records in `docs/adr/`.
 - `skills/frontend/` — Building and styling UI as a full operating mode: forced design commitment, token system before pixels, components/state/layout/accessibility discipline, craft details, a banned list for the generic AI look, and a mandatory hostile self-critique loop run twice. Also works pasted into another model's system prompt.
 - `skills/backend/` — Server work and non-UI coding as a full operating mode: evidence before edits, done-as-a-check, surgical diffs, boundaries/authz/errors/migrations discipline, a banned list for generic AI code tells, and the same mandatory self-critique loop. Also works pasted into another model's system prompt.
@@ -50,7 +50,7 @@ A big chunk of this suite is adapted from **[Matt Pocock](https://github.com/mat
 
 - `plan` ← `grill-me` + `grill-with-docs` + `to-prd` + `to-issues`
 - `idea` ← `prototype` (the prototype operation)
-- `variations` ← `design-an-interface` + `prototype`'s UI branch
+- `variants` ← `design-an-interface` + `prototype`'s UI branch
 - `audit` ← `review` + `qa`
 - `learn` ← `teach` (including the workspace format files)
 - `caveman` ← `caveman`
