@@ -43,7 +43,7 @@ Work from what's already in the conversation, the codebase, and the knowledge ba
 
 ## The PRD (both modes)
 
-`docs/plans/<slug>.md`:
+`docs/plans/NNNN-<slug>.md` — 4-digit zero-padded, incrementing from the highest existing number in `docs/plans/` (its own sequence, independent of `docs/adr/`). First plan in a repo starts at `0001`.
 
 - **Problem** — from the user's perspective, not the system's.
 - **Solution** — what changes for the user.
