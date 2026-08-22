@@ -17,28 +17,18 @@ Codex has no stable user-defined subagent format yet — it gets
 
 ## Install / re-sync
 
-```bash
-cp agents/advisor/claude/advisor.md   ~/.claude/agents/advisor.md
-cp agents/advisor/opencode/advisor.md ~/.config/opencode/agent/advisor.md
-```
+On any machine: clone this repo and run `./install.sh` from its root.
 
-`discipline.md` needs no copy — the global files are two-line stubs:
+- **Global** (every tool, every project): only `caveman` + `html`,
+  plus the discipline pointers and advisor subagents.
+- **Per-project**: from this repo, run
+  `./install.sh --project <dir> <skill...>` (or `all`) to link chosen
+  skills into that project's `.claude/skills`, `.agents/skills`, and
+  `.opencode/skill`.
 
-`~/.claude/CLAUDE.md`:
-
-```
-# CLAUDE.md
-
-@/<path-to-this-repo>/agents/discipline/discipline.md
-```
-
-`~/.codex/AGENTS.md`:
-
-```
-# AGENTS.md
-
-Read /<path-to-this-repo>/agents/discipline/discipline.md first and follow it for every task in every repo.
-```
+Everything is symlinked — edits in this repo apply everywhere instantly.
+Re-run anytime to repair links or change the global set
+(`GLOBAL_SKILLS` at the top of `install.sh`).
 
 ## Editing the advisor prompt
 
