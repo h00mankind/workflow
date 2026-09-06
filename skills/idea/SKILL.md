@@ -1,9 +1,9 @@
 ---
 name: idea
-description: Capture, track, validate, and prototype ideas — one file per idea in docs/ideas/ with a status lifecycle (spark → validated → building → parked → dead). Capture is fast and question-free, and ends by offering a throwaway prototype to test the idea's riskiest assumption. Use when the user has a new idea to jot down, asks "what ideas do I have", wants to validate or kill an idea, or wants to prototype or sanity-check a data model, state machine, or logic before committing.
+description: Capture, list, validate, or park ideas with spark-to-dead lifecycle, ending in a throwaway prototype of the riskiest assumption. Use when jotting ideas, asking what ideas do I have, or prototyping a model before committing.
 ---
 
-# idea
+# # idea
 
 One file per idea in `docs/ideas/<slug>.md`. Four operations — infer which from the request. Default is **capture**.
 

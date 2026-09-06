@@ -1,9 +1,9 @@
 ---
 name: write-a-skill
-description: Create or revise a skill in this repo, following its house style — one-word names where possible, trigger-rich descriptions, concise bodies, combined skills with modes or targets over many narrow ones. Use when the user wants to create, write, improve, simplify, or combine a skill, or says "make a skill for X".
+description: Create, revise, or combine repo skills in house style with one-word names and modes over siblings. Use when the user says make a skill for X, improve a skill, or simplify skills.
 ---
 
-# write-a-skill
+# # write-a-skill
 
 A skill exists to wrangle determinism out of a stochastic system. **Predictability** — the agent taking the same *process* every run, not producing the same output — is the goal, and every rule below serves it. A skill is loaded by its description and judged by its brevity: the description does the triggering, the body does the teaching.
 

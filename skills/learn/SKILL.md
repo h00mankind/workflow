@@ -1,8 +1,7 @@
 ---
 name: learn
-description: Multi-session learning workspace — teaches the user a topic through small HTML lessons grounded in a mission, built from a shared component library, with progress, glossary, and trusted sources tracked in docs/learn/<topic>/. Use when the user wants to learn or be taught something — a language, framework, concept, or practice — or says "teach me", "I want to learn", or "next lesson".
+description: Use to teach a topic, start a learning workspace, or continue lessons, including "teach me", "I want to learn", and "next lesson".
 ---
-
 # learn
 
 Learning is stateful — the user learns over multiple sessions. State lives in `docs/learn/<topic>/`, created lazily (a file appears when there's something to write in it):

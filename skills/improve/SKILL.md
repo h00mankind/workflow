@@ -1,9 +1,9 @@
 ---
 name: improve
-description: Audit-then-improve pass over UI, UX, code, security, or all of them at once (deep) — always starts by asking what area to improve and which mode: audit (report only) or execute (audit, then apply every safe fix in one go). Sweeps a checklist, then critiques like a hostile reviewer; for UI it inspects the rendered result. Produces severity-ranked findings with evidence; in execute mode it applies the fixes immediately after. Use when the user wants a review, audit, critique, security review, asks "is this safe to ship", or wants something polished, cleaned up, hardened, refactored, or improved.
+description: Audit then improve UI, UX, code, security, or architecture with severity-ranked findings. Use for reviews, audits, critiques, cleanup, or when asking is this safe to ship; runs audit-only or executes fixes.
 ---
 
-# improve
+# # improve
 
 Find what's weak, prove it, then make it better. Two questions first, always.
 

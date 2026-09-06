@@ -1,9 +1,9 @@
 ---
 name: ship
-description: Prepare and publish local git changes through branch, commit, push, and pull request with reviewer-ready discipline. Use when the user says "ship it", "commit this", "push this", "open a PR", "create a PR", "publish these changes", or "make a branch". Skip for read-only git inspection, CI debugging, or responding to PR review comments.
+description: Publish git changes via branch, commit, push, and PR with reviewer-ready discipline. Use when the user says ship it, commit this, or open a PR; skip read-only inspection and review replies.
 ---
 
-# ship
+# # ship
 
 Ship like a careful engineer: know the diff, prove it works, publish only the intended change, and leave a PR a reviewer can understand.
 

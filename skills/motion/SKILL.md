@@ -1,8 +1,7 @@
 ---
 name: motion
-description: Animation and motion design for interfaces — what to animate, durations, easing, springs, gestures, performance, and reduced motion. Use when adding or tuning animations, transitions, micro-interactions, page transitions, scroll effects, drag/swipe gestures, or anything that moves.
+description: Use to add or tune UI animation, transitions, gestures, scroll effects, or other interface motion.
 ---
-
 # motion
 
 Motion explains — where things came from, that an action landed, where to look next. If an animation explains nothing, cut it.

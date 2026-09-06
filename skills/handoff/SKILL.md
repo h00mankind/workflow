@@ -1,9 +1,9 @@
 ---
 name: handoff
-description: Compact the current conversation into a handoff document a fresh agent can pick up without re-deriving anything. Use when the user wants to hand off work, wrap up a session for later, transfer context to another agent or session, or says "handoff". An argument, if given, describes what the next session will focus on.
+description: Hand off a session so another agent continues without re-deriving context. Use when the user says handoff, wraps a session for later, or transfers context.
 ---
 
-# handoff
+# # handoff
 
 Write a handoff document so a fresh agent continues the work without re-deriving it. Save to the OS temp directory — not the workspace — and report the absolute path.
 

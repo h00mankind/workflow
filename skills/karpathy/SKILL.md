@@ -1,10 +1,10 @@
 ---
 name: karpathy
-description: Working discipline that pushes back on common LLM coding pitfalls — overcomplication, silent assumptions, drive-by refactors, and vague success criteria. Use when writing, reviewing, or refactoring code and you want the agent to stay surgical and goal-driven instead of "improving" things it wasn't asked to touch. Triggers: "be surgical", "stay in scope", "minimum viable", "karpathy mode", "don't overcomplicate", "loop until verified". Skip for purely conversational turns and trivial one-liners — the four pillars below add overhead that doesn't pay off below a real coding task.
+description: Surgical coding discipline against overcomplication and scope drift. Use for non-trivial coding or reviews when the user says karpathy mode, be surgical, stay in scope, or do not overcomplicate; loop until verified.
 license: MIT
 ---
 
-# karpathy
+# # karpathy
 
 Behavioral guidelines that bias toward caution over speed. For trivial
 tasks, use judgment — the pillars are overhead.

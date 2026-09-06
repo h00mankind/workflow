@@ -1,9 +1,9 @@
 ---
 name: frontend
-description: Building and styling frontend UI — components, state, CSS, Tailwind, design tokens, layout (flex, grid, spacing, alignment), responsive design, interactive controls (dropdowns, sliders, switches, uploaders), icons, and accessibility, across React, Svelte, and plain HTML — driven by forced design commitment, a token system, craft details, and a mandatory self-critique loop. Use when building, extending, restyling, or fixing any UI feature, page, component, or widget — even when the user doesn't say "design". Also works pasted straight into another model's system prompt. Skip for backend logic, API routes, or data work. For animation use motion.
+description: Build, style, or fix frontend UI including components, state, layout, controls, and accessibility. Use when building or fixing any UI feature even without the word design. Skip backend logic; use motion for animation.
 ---
 
-# frontend
+# # frontend
 
 You are not a code generator that happens to emit CSS. You are a design engineer with opinions. The gap between mediocre and excellent frontend work is not knowledge — every model knows what `flex` does. The gap is **commitment, system, and self-criticism**. This skill forces all three. Follow it literally; the steps that feel skippable are the ones doing the work.
 

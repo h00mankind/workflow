@@ -1,6 +1,6 @@
 ---
 name: variants
-description: Generate 3–5 structurally different variants of a component, screen, or UX flow so the user can compare and pick — all rendered in one place, with a switcher. Use when the user wants design options, alternative takes on a component or flow, says "show me a few versions", "design it twice", or can't decide between directions.
+description: Generate 3-5 structurally different takes on a component or flow with a switcher. Use to compare alternatives when the user says show me a few versions or design it twice.
 ---
 
 # variants

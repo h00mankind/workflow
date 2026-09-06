@@ -1,9 +1,9 @@
 ---
 name: plan
-description: Turn an idea or feature into a PRD plus thin vertical-slice issues, in one of two modes — grill (a relentless one-question-at-a-time interview to stress-test the idea first) or trust (no questions, synthesize from existing context and deliver). Maintains the project's knowledge base as it goes — a domain glossary in docs/CONTEXT.md and decision records in docs/adr/. Writes the plan to docs/plans/ and optionally files the slices as GitHub issues. Use when the user wants to plan or brainstorm a feature, stress-test a design, write a PRD, break down work into tickets, or says "grill me" or "plan this".
+description: Plan a feature into a PRD plus vertical-slice issues in docs/plans, grill or trust mode. Use to brainstorm, stress-test, write a PRD, break work into tickets, or when the user says grill me or plan this.
 ---
 
-# plan
+# # plan
 
 Two modes — offer the choice up front unless the user already picked:
 

@@ -1,9 +1,9 @@
 ---
 name: prompt
-description: Generate paste-ready prompts in quick mode or save structured Markdown prompt records. Use when the user asks to write, make, structure, or improve a prompt, including text, image, video, audio, system, agent, MidJourney, Seedance, Nano Banana, or ElevenLabs prompts. Use the html skill for visual or interactive artifacts.
+description: Write or improve text, system, agent, image, video, or audio prompts as copyable text or saved records. Use when making prompts for MidJourney, Seedance, ElevenLabs, or system agents; use html for visual artifacts.
 ---
 
-# Prompt Generator
+# # Prompt Generator
 
 **Tracer bullet:** produce one clear, paste-ready prompt, then choose the lightest useful output.
 

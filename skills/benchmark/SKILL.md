@@ -1,9 +1,9 @@
 ---
 name: benchmark
-description: Benchmark models head-to-head or eval skills (with-skill vs bare baseline) on a calibrated mid-weight task — Claude models at any effort level, plus external CLI agents like codex, gemini, or cursor-agent. Parallel sub-agents do the work, a blind judge scores it, and an HTML report lands in benchmarks/ with a CursorBench-style leaderboard (score %, cost/task, tokens/task, steps/task). Use when the user wants to benchmark, eval, compare, or A/B test models, skills, or coding agents, asks "which model is better at X" or "does this skill actually help", or says /benchmark, /benchmark model, /benchmark skill. Quick mode is the default (one task, minimal questions); "deep" runs more tasks and contenders.
+description: Benchmark coding models, agents, or skills with parallel subagents and a blind judge, including with-skill versus bare baselines. Use when comparing models or skills, asking which model fits a task, or saying /benchmark, quick, or deep.
 ---
 
-# benchmark
+# # benchmark
 
 A benchmark is only as fair as its blindest part: identical prompts, isolated runs, a judge who doesn't know whose work it's scoring, and stats you actually measured.
 

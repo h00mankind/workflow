@@ -1,6 +1,6 @@
 ---
 name: name
-description: Generate and screen brand name candidates the way professional naming agencies do — across the full name-type taxonomy (descriptive, suggestive, invented, compound, portmanteau, acronym, palindrome, and more), screened on sound symbolism, pronounceability, and Abercrombie distinctiveness. Two modes — quick (no questions, ~20 candidates) and deep (a 5–10 question grill, then 100+ candidates down to a 20–30-name shortlist; the default). Always outputs an interactive HTML artifact of the whole candidate pool — taxonomy coverage bar, filterable by type and metaphor, starrable into the user's own shortlist, with copy-as-markdown. Use whenever the user wants to name a company, product, feature, app, project, startup, or anything else; asks for "name ideas", "brand names", "what should I call this", a rebrand, or help picking between names they already have. Flags trademark and domain risks but is not legal clearance.
+description: Generate and screen brand names across descriptive to invented types with sound and distinctiveness checks. Use to name a company, product, or feature; quick gives 20 names, deep grills then 100-plus into an HTML shortlist. Not legal clearance.
 ---
 
 # name
