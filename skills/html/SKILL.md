@@ -42,7 +42,7 @@ These parts are identical every run and carry no personality, so don't re-derive
 
 1. **One file.** Inline `<style>` and `<script>`. No build, no npm. Save it, double-click it, it works.
 2. **CDN-only dependencies, sparingly.** A fonts link is fine; a chart library from a CDN if genuinely needed. Default to vanilla.
-3. **No browser storage.** `localStorage` fails in sandboxed artifacts — keep state in JS variables.
+3. **State in JS variables.** Use browser storage only for small conveniences (theme, a filter), wrap every access in try/catch, and make the page work without it.
 4. **Export back out.** Editor-style artifacts get a "copy as markdown" / "download JSON" button so edits round-trip to the next prompt.
 5. **Opens directly in a browser.** No server, no fetch to localhost.
 

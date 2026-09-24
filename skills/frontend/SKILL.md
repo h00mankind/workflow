@@ -5,7 +5,7 @@ description: Build, style, or fix frontend UI including components, state, layou
 
 # # frontend
 
-You are not a code generator that happens to emit CSS. You are a design engineer with opinions. The gap between mediocre and excellent frontend work is not knowledge — every model knows what `flex` does. The gap is **commitment, system, and self-criticism**. This skill forces all three. Follow it literally; the steps that feel skippable are the ones doing the work.
+You are not a code generator that happens to emit CSS. You are a design engineer with opinions. The gap between mediocre and excellent frontend work is not knowledge — every model knows what `flex` does. The gap is **commitment, system, and self-criticism**. This skill forces all three.
 
 ## The contract
 
@@ -13,7 +13,7 @@ You are not a code generator that happens to emit CSS. You are a design engineer
 2. **Direction before code.** Write one binding sentence before the first line of markup. Every later choice must defend itself against that sentence.
 3. **System before pixels.** Tokens first, components after. Any value used twice without a token is a bug.
 4. **Render before reporting.** "It compiles" is not done. Done is: you looked at it.
-5. **Critique before delivering.** The loop at the bottom is mandatory, not optional polish.
+5. **Critique before delivering.** Review your own work before you report — see the loop at the bottom.
 
 ## Absorb
 
@@ -88,14 +88,11 @@ Each of these is a tell. If you catch yourself emitting one, stop and replace it
 - Every section the same: heading, paragraph, card grid, repeat → vary density and rhythm; let one section be a single sentence if that's what it needs.
 - `outline: none`, divs as buttons, placeholder alt text → semantic elements, real labels, visible focus.
 
-## The loop — mandatory, twice
+## The loop — before delivering
 
-1. **Render it.** Run the app, open the file, screenshot it. No renderer available? Walk the DOM mentally at 360px and 1440px and say you did.
-2. **Critique as a hostile senior design engineer.** Write down exactly **five specific criticisms** with locations — "the table header and body text are both 14px/500, so the header disappears (line 84)" counts; "could be more polished" does not. The hostility matters: a friendly reviewer finds nothing.
-3. **Fix all five.** No deferring, no "in a future iteration".
-4. **Repeat once.** The second pass finds what the first pass's fixes broke — and the second five are where good becomes excellent.
-
-First drafts are always mediocre — including yours. Skipping this loop ships a first draft and calls it done. That is the entire difference.
+1. **Render it.** Run the app, open the file, screenshot it. No renderer available? Say so, then reason through the markup at 360px and 1440px — don't claim you looked.
+2. **Critique as a skeptical senior design engineer.** Write down each concrete problem with its location — "the table header and body text are both 14px/500, so the header disappears (line 84)" counts; "could be more polished" does not.
+3. **Fix what you found** — no deferring to a future iteration — then render again. If the fixes were large, critique the new render once more.
 
 ## Verify, then deliver
 
