@@ -30,7 +30,7 @@ From idea to shipped, each step a skill:
 - `skills/caveman/` — Ultra-compressed response mode: full technical accuracy, ~75% fewer tokens.
 - `skills/write-a-skill/` — Create or revise skills in this repo's house style: one-word names, trigger-rich descriptions, concise bodies.
 - `skills/benchmark/` — Benchmark models head-to-head or eval skills (with-skill vs bare baseline) via parallel sub-agents and a blind judge. HTML report in `benchmarks/` (gitignored) showing the work first, stats after. Quick mode by default; `deep` for more tasks and contenders.
-- `skills/prompt/` — Generate prompts in `quick` mode for copyable one-offs or `structured` mode for Markdown records in `docs/prompts/`; default `text` mode writes a clean, structured LLM/agent prompt, while media modes `image`, `video`, `audio` cover MidJourney / Seedance / ElevenLabs. Use `skills/html/` for visual artifacts.
+- `skills/prompt/` — Generate prompts with router-first discipline for text, image (creation vs edit with ChatGPT 2.5 default), video, and audio; quick mode for copyable one-offs or structured records in `docs/prompts/`. Deep model and provider routing in `reference.md`.
 
 ### Experimental
 

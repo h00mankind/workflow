@@ -1,51 +1,44 @@
 ---
 name: prompt
-description: Write or improve text, system, agent, image, video, or audio prompts as copyable text or saved records. Use when making prompts for MidJourney, Seedance, ElevenLabs, or system agents; use html for visual artifacts.
+description: Write or improve text, image, video, or audio prompts with routing for new generation, editing, and model-specific rules. Use when writing prompts, prompt routing, image prompt, image edit, video prompt, audio prompt, or targeting ChatGPT 2.5, Midjourney, Nano Banana, or Seedance; use html for visual artifacts.
 ---
 
-# # Prompt Generator
+# # prompt
 
-**Tracer bullet:** produce one clear, paste-ready prompt, then choose the lightest useful output.
+**Router-First:** determine the output modality and edit intent before writing the prompt. Route image generation and edits to ChatGPT 2.5 by default unless the user names another model. For deep provider settings and API schemas, load `reference.md`.
+
+## Routing decision tree
+
+1. **Classify modality:**
+   - `text` (default): Task, delimited Context, exact Format, positive Constraints.
+   - `image`: branch to **New Creation** or **Image Edit**.
+   - `video`: branch to **Text-to-Video** or **Image-to-Video**.
+   - `audio`: Intent/mood, speech (TTS) or music/SFX.
+2. **Classify image intent and target:**
+   - **Default model:** ChatGPT 2.5 (`gpt-image-2.5-flare` for fast/volume; `gpt-image-2.5-sunburst` for precision/high quality).
+   - **New Creation:** Subject + Action + Environment + Lighting + Framing. Use natural sentences; put text in quotes; set dimensions or `background="transparent"` when needed.
+   - **Image Edit:** Name the exact change and what stays unchanged (`Change only X. Preserve Y and Z`). Make one edit per turn. Assign roles to inputs (`Image 1` for identity, `Image 2` for clothing).
+   - **Provider overrides:**
+     - *Midjourney:* `--v 8.2` only, comma-separated descriptors, `--ar`, `--s`, `--cref`, `--sref`.
+     - *Google:* Nano Banana Pro or Nano Banana 2 models. 5-part layered description, `aspectRatio`, exact quotes.
+     - *Grok Imagine:* director's brief `[Subject] + [Setting] + [Style] + [Lighting]`.
+3. **Classify video intent:**
+   - Front-load camera movement in the first 20 words (dolly, tracking, static tripod).
+   - Assign roles to references (`@Image1` as start frame, `@Image2` as end frame).
 
 ## Choose output mode
 
-Use the request to choose the mode:
-
-- **Quick:** one-off task or no request to save. Return the finished prompt in a fenced `text` block so the user can copy it. Do not create files.
-- **Structured:** reusable prompt, prompt record, or explicit request to save. Create `docs/prompts/NNNN-<content-mode>-<slug>/prompt.md`.
-- **HTML artifact:** do not create it here. Use the `html` skill when the user asks for a visual, interactive, or browser-ready artifact.
-
-If the request does not show which mode is useful, ask:
-
-> Quick copyable prompt, or structured Markdown prompt folder?
-
-## Content modes
-
-- **`text` (default):** Role when useful; Task; delimited Context; exact Format; positive Constraints. Write the prompt itself, not commentary about it.
-- **`image`:** Subject + Action + Location/context. Use natural description. For edits, name what changes and what stays the same; make one change per prompt.
-- **`video`:** Subject performing Motion in Environment. Give every image or video reference a role. Add camera, style, audio, text, or transitions only when requested.
-- **`audio`:** Intent/use case + genre/mood. Add BPM, key, length, timing, or vocal controls only when requested.
-
-Keep prompts portable, specific, and free of padding. Use one prompt unless the user asks for variants.
-
-## Workflow
-
-1. Choose `quick` or `structured` from the request; ask only when the choice is unclear. Then choose the content mode. `text` is the default unless the request names a medium.
-2. Clarify only information required to produce the prompt. Preserve good wording from any rough prompt and delimit pasted material.
-3. Draft the prompt. Prefer positive instructions; omit model-specific flags and metadata unless requested.
-4. Complete the chosen output:
-   - **Quick:** return only the finished prompt in a copyable `text` block.
-   - **Structured:** find the next unused four-digit sequence, create the folder, write `prompt.md`, and add `assets/` only when source files need to be preserved.
-5. Report one line. In structured mode, include the saved file path.
+- **Quick (default):** return the finished prompt in a copyable `text` block with model/parameter notes below. Do not create files.
+- **Structured:** create `docs/prompts/NNNN-<mode>-<slug>/prompt.md`. Inspect `docs/prompts/` for the highest existing four-digit prefix, increment to the next unused sequence (never reuse), and keep source media in `assets/` only when original files must be preserved.
 
 ## Structured Markdown format
-
-Use one `prompt.md` per prompt record:
 
 ````markdown
 ---
 title: <short title>
 mode: <text|image|video|audio>
+target: <chatgpt-2.5|midjourney|nano-banana|grok|seedance|general>
+intent: <create|edit|tts|music|general>
 created: <YYYY-MM-DD>
 ---
 
@@ -55,42 +48,32 @@ created: <YYYY-MM-DD>
 <finished prompt>
 ```
 
-## How to use
+## Settings and Usage
 
-<short target-model or workflow note>
+- Model: <target model>
+- Parameters: <size, quality, aspect ratio, or provider flags>
+- Workflow: <generation instructions or edit reference roles>
 ````
-
-Use a longer outer fence when the prompt itself contains triple backticks. Keep notes short and factual. Put copied source files in `assets/` and reference them with relative paths.
-
-## Sequence and naming
-
-- Inspect `docs/prompts/` for the highest existing four-digit folder prefix. Start at `0001` when none exists.
-- Never reuse or back-fill a number.
-- Use `NNNN-<content-mode>-<slug>` for the folder. Keep the file name `prompt.md`.
 
 ## Guardrails
 
-- Text: put pasted material inside a delimiter such as `<input>…</input>`.
-- Image: describe what is present; do not add `--ar`, `--v`, `--style`, or `--no` unless asked.
-- Video: assign a role to every reference instead of listing filenames only.
-- Audio: do not pad a short musical brief with technical controls.
-- Do not add HTML, CSS, JavaScript, or an HTML artifact from this skill.
+- Image edit prompts must explicitly separate changes from preserved regions.
+- Do not append Midjourney flags (`--ar`, `--v`) when prompting ChatGPT 2.5 or Nano Banana.
+- Video prompts must start with camera motion and physical action before stylistic details.
+- For transparent image assets, request transparent background and PNG or WebP output.
+- Do not generate HTML artifacts here; use the `html` skill for interactive files.
 
 ## Example
 
-Task: “prompt to summarize support tickets” — use quick mode for this one-off:
+Task: "edit image to change clothing on the subject":
 
 ```text
-You are a support-operations analyst.
-
-Summarize the support ticket below for an engineer who has not seen it.
-
-<ticket>
-{paste ticket here}
-</ticket>
-
-Format: Problem, steps already tried, and what the customer wants.
-Constraints: stay factual, quote error messages exactly, and keep the summary under 120 words.
+Edit the image to dress the woman using the provided clothing images.
+Do not change her face, facial features, skin tone, body shape, pose, or identity in any way.
+Preserve her exact likeness, expression, hairstyle, and proportions.
+Replace only the clothing with the beige jacket and white top from the reference images, fitting the garments naturally to her pose.
+Match the original lighting, shadows, and color temperature.
+Do not change the background, camera angle, or framing.
 ```
 
-Done means the quick prompt is self-contained, or the structured `prompt.md` exists at the reported path with valid frontmatter and the finished prompt.
+Done means the prompt adheres to the routed target conventions, separates edits from invariants, and is returned as a copyable block or saved at the structured path.
