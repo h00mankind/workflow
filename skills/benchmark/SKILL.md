@@ -13,7 +13,7 @@ Parse the argument for a target (`model` or `skill`) and a mode (`deep`; quick o
 
 - No target → one question: benchmark **models** or **skills**?
 - **Model · quick** — contenders are whatever the user named, else the session's model plus one sensible rival; one task. **Model · deep** — ask how many and which; 2–3 tasks.
-- Contenders can be **Claude models at any effort** (fable, opus, sonnet, haiku × low/medium/high/xhigh/max) or **external CLI agents** (codex, gemini, cursor-agent, …) — see §3 for how each runs.
+- Contenders can be **Claude models** — fable, opus, and sonnet at any effort (low/medium/high/xhigh/max); haiku only at its default, since Haiku 4.5 rejects an effort setting — or **external CLI agents** (codex, gemini, cursor-agent, …) — see §3 for how each runs.
 - **Skill · quick** — one skill, one task, two conditions: *with-skill* vs *bare* on the same model. **Skill · deep** — several skills, or two skills pitted against each other on shared ground.
 
 In quick mode never ask more than one question total — pick a task yourself, state it, and let the user veto.

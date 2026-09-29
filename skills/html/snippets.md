@@ -41,7 +41,7 @@ function setIcon(el, name) { el.className = name }   // setIcon(themeIcon, dark 
 
 ## Theme switcher
 
-Top-right button, **text label only** ("Dark mode" / "Light mode") — no sun/moon glyphs, they render inconsistently and look like placeholder. Define both palettes in `:root` and `[data-theme="dark"]`; flip `data-theme` on `<html>`. No browser storage — keep the current theme in a JS variable. Respect `prefers-color-scheme` on first paint and sync the label then.
+Top-right button, **text label only** ("Dark mode" / "Light mode") — no sun/moon glyphs, they render inconsistently and look like placeholder. Define both palettes in `:root` and `[data-theme="dark"]`; flip `data-theme` on `<html>`. Keep the current theme in a JS variable; persist it only as Constraint 3 allows. Respect `prefers-color-scheme` on first paint and sync the label then.
 
 ```html
 <button id="theme" aria-label="Switch theme">Dark mode</button>

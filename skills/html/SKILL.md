@@ -35,14 +35,14 @@ No shared stylesheet; the subject dictates the look. A post-mortem reads like a 
 These parts are identical every run and carry no personality, so don't re-derive them — copy from `snippets.md` and theme the tokens to fit:
 
 - **Spacing scale** — pick a scale, not arithmetic; set once in `:root`, use everywhere. No stray pixel/em spacing — a single `3px` in the wrong place is the fastest tell of a sloppy artifact.
-- **Theme switcher** — if the artifact is returned to or read in different lighting, ship both themes (default by content), text-label button, no storage, respect `prefers-color-scheme`.
+- **Theme switcher** — if the artifact is returned to or read in different lighting, ship both themes (default by content), text-label button, theme held in a JS variable, respect `prefers-color-scheme`.
 - **Right-side TOC + scrollspy** — for 3+ `<h2>` sections. The two traps the bundle handles: header/footer outside the grid (or the rule strands next to the TOC), and the per-item tick spacing on the `<li>` not the link (or the ticks merge into one rail).
 
 ## Constraints
 
 1. **One file.** Inline `<style>` and `<script>`. No build, no npm. Save it, double-click it, it works.
 2. **CDN-only dependencies, sparingly.** A fonts link is fine; a chart library from a CDN if genuinely needed. Default to vanilla.
-3. **No browser storage.** `localStorage` fails in sandboxed artifacts — keep state in JS variables.
+3. **State in JS variables.** Use browser storage only for small conveniences (theme, a filter), wrap every access in try/catch, and make the page work without it.
 4. **Export back out.** Editor-style artifacts get a "copy as markdown" / "download JSON" button so edits round-trip to the next prompt.
 5. **Opens directly in a browser.** No server, no fetch to localhost.
 

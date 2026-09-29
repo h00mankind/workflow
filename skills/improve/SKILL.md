@@ -5,11 +5,11 @@ description: Audit then improve UI, UX, code, security, or architecture with sev
 
 # # improve
 
-Find what's weak, prove it, then make it better. Two questions first, always.
+Find what's weak, prove it, then make it better. Area and mode first.
 
-## Always ask first
+## Area and mode first
 
-Open with **one AskUserQuestion call** containing both questions — even if the user named an area, confirm the mode (and vice versa):
+Ask for whichever of area and mode the user didn't give, in **one AskUserQuestion call**. If both are given, start:
 
 1. **Area** — `ui` / `ux` / `code` / `security` / `all (deep)`. Deep runs every area and adds an architecture pass.
 2. **Mode** — **audit** (report findings, change nothing) or **execute** (audit, then apply every safe fix in one go without a second confirmation).
@@ -20,7 +20,7 @@ If the user also gave a scope (a page, flow, module, branch, diff), keep it; oth
 
 1. **Inspect the real thing.** For `ui` and `ux`, look at the rendered result, not the source — see *Seeing the UI* below. For `code` and `security`, read the actual call paths, not just the files that changed.
 2. **Sweep with the matching checklist** below, then go past it: cross-cutting patterns, inconsistencies between areas, things the checklist wouldn't catch.
-3. **Critique like a hostile reviewer.** A checklist sweep finds the obvious; the findings that matter come from a second, adversarial read — see *The critique pass* below. A friendly reviewer finds nothing.
+3. **Critique like a skeptical reviewer.** A checklist sweep finds the obvious; the findings that matter come from a second, adversarial read — see *The critique pass* below.
 4. **Report** in the format below.
 5. **Execute mode:** apply the fixes immediately, smallest diff per finding, behavior unchanged — this raises quality, not functionality. Verify after: re-inspect the UI, walk the flow, run the code and tests. Findings too risky to patch inline (auth-model changes, migration rewrites, large architecture refactors) stay report-only — say so explicitly. **Audit mode:** stop after the report; end with "run `/improve` again in execute mode to apply these."
 
@@ -32,12 +32,12 @@ But low contrast, nonstandard interaction, or restraint on motion can be a **del
 
 ## The critique pass
 
-Don't just list checklist misses. Read the work a second time as a **hostile senior reviewer** and write down **five specific criticisms, each with a location** — `file:line` for code, screen + element for UI. "The table header and body are both 14px/500, so the header disappears" counts; "could be more polished" does not. Vague criticism is a no-op.
+Don't just list checklist misses. Read the work a second time as a **skeptical senior reviewer** and write down **every real criticism, each with a location** — `file:line` for code, screen + element for UI. "The table header and body are both 14px/500, so the header disappears" counts; "could be more polished" does not. Vague criticism is a no-op.
 
 This pass is **mode-scaled** — it does not double back on itself like the building loop in `frontend`:
 
-- **Audit mode:** the five located criticisms *are* the report. No fixing, no second pass — cheap by design.
-- **Execute mode:** one pass only — critique, fix all five, then verify (re-inspect / run). No forced repeat. This is an audit of presumably-working code, not a first draft; a second loop is build-time discipline that doesn't pay off here.
+- **Audit mode:** the located criticisms *are* the report. No fixing, no second pass — cheap by design.
+- **Execute mode:** one pass only — critique, fix what you found, then verify (re-inspect / run). No forced repeat. This is an audit of presumably-working code, not a first draft; a second loop is build-time discipline that doesn't pay off here.
 
 ## Seeing the UI
 
