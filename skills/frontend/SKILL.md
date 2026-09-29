@@ -75,7 +75,7 @@ Use the project's existing tokens, or declare these as CSS custom properties bef
 
 ## Motion
 
-Keep it simple: 150–250ms micro / 250–400ms panels, ease-out in, ease-in out, exits faster than entrances, transform and opacity only, `prefers-reduced-motion` honored with fast opacity fallbacks. The `motion` skill goes deeper when something moves in earnest.
+Keep it simple: 150–250ms micro / 250–400ms panels, ease-out for enters and exits (never ease-in), exits faster than entrances, transform and opacity only, `prefers-reduced-motion` honored with fast opacity fallbacks. The `motion` skill goes deeper when something moves in earnest.
 
 ## Banned — the generic AI look
 

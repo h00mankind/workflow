@@ -81,7 +81,7 @@ In this repo the bias is *against* splitting: prefer a mode or a target argument
 
 ## Glossary
 
-**Module-invoked / user-invoked** — see [The two loads](#the-two-loads).
+**Model-invoked / user-invoked** — see [The two loads](#the-two-loads).
 **Context load / cognitive load** — the two budgets a skill spends.
 **Information hierarchy** — the ladder (step → in-skill reference → external reference) ranked by immediacy of need.
 **Progressive disclosure** — moving a piece down the ladder into a linked file.
