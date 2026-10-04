@@ -7,10 +7,10 @@ use anyhow::{Context as _, Result, bail};
 use crate::{
     apply::{self, Env, Plan},
     config::Config,
-    library, manifest, sources,
+    library, manifest, mcp_server, sources,
 };
 
-pub const COMMANDS: &[&str] = &["status", "apply", "sources", "library", "help", "--help", "-h"];
+pub const COMMANDS: &[&str] = &["status", "apply", "sources", "library", "mcp-server", "help", "--help", "-h"];
 
 const USAGE: &str = "\
 workflow-setup [project-path]          open the window
@@ -18,6 +18,7 @@ workflow-setup status [scope]          show the drift between manifest.toml and 
 workflow-setup apply [scope]           make the disk match manifest.toml (--dry-run: change nothing;
                                        --adopt: replace a link that something else made)
 workflow-setup library                 list the plugins, their skills, and the names two plugins share
+workflow-setup mcp-server              serve the library to agents over stdio
 workflow-setup sources fetch [name]    get the newest commit of each source into the cache
 workflow-setup sources diff [name]     show what the fetched commit would change (--stat: no patch)
 workflow-setup sources accept <name>   write the copy and move the pin (--all: every source)
@@ -30,6 +31,7 @@ pub fn run(args: &[String]) -> Result<()> {
     let words: Vec<&str> = args.iter().map(String::as_str).filter(|arg| !arg.starts_with("--")).collect();
     let flag = |name: &str| args.iter().any(|arg| arg == name);
     match words.as_slice() {
+        ["mcp-server"] => mcp_server::run(&Env::new(find_library()?)),
         ["library"] => list(&find_library()?),
         ["status", scopes @ ..] => status(scopes, false, false, true),
         ["apply", scopes @ ..] => status(scopes, !flag("--dry-run"), flag("--adopt"), flag("--dry-run")),
@@ -114,25 +116,32 @@ fn status(names: &[&str], write: bool, adopt: bool, show: bool) -> Result<()> {
     Ok(())
 }
 
-fn is_scope(env: &Env, plan: &Plan, name: &str) -> bool {
+pub(crate) fn is_scope(env: &Env, plan: &Plan, name: &str) -> bool {
     let path = std::path::absolute(name).unwrap_or_default();
     plan.scope.label == name || plan.scope.root == path || tilde(env, &plan.scope.root) == name
 }
 
 fn print_plan(env: &Env, plan: &Plan) {
+    print!("{}", format_plan(env, plan));
+}
+
+/// The same drift text for the command line and the MCP server.
+pub(crate) fn format_plan(env: &Env, plan: &Plan) -> String {
+    let mut text = String::new();
     let root = tilde(env, &plan.scope.root);
     let title = if plan.scope.global { format!("global ({root})") } else { root };
     for collision in &plan.collisions {
-        println!("{title}: opencode has no prefix. {} is in {} and {}. {} wins.", collision.name, collision.winner, collision.losers.join(", "), collision.winner);
+        text.push_str(&format!("{title}: opencode has no prefix. {} is in {} and {}. {} wins.\n", collision.name, collision.winner, collision.losers.join(", "), collision.winner));
     }
     if plan.in_sync() {
-        println!("{title}: in sync");
-        return;
+        text.push_str(&format!("{title}: in sync\n"));
+        return text;
     }
-    println!("{title}: {} to change", plan.changes.len());
+    text.push_str(&format!("{title}: {} to change\n", plan.changes.len()));
     for (label, names) in plan.groups(&env.home) {
-        println!("  {label}\n    {} ({})", names.join(" "), names.len());
+        text.push_str(&format!("  {label}\n    {} ({})\n", names.join(" "), names.len()));
     }
+    text
 }
 
 fn tilde(env: &Env, path: &Path) -> String {
