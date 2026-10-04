@@ -1,8 +1,8 @@
-//! Outside sources: git repositories whose skills the library keeps as
-//! verbatim copies at a pinned commit.
+//! Outside sources: git repositories that the library keeps as verbatim
+//! copies at a pinned commit, one plugin folder per source.
 //!
 //! `fetch` gets a source's newest commit into a cache and remembers it.
-//! `diff` shows what that commit would change in `skills/<source>/`.
+//! `diff` shows what that commit would change in `plugins/<source>/`.
 //! `accept` writes the copy and moves the pin. Only `accept` changes the
 //! library, and it accepts the commit that `diff` showed.
 
@@ -16,6 +16,8 @@ use std::{
 use anyhow::{Context as _, Result, bail};
 use toml_edit::DocumentMut;
 
+use crate::plugins;
+
 pub const FILE: &str = "sources.toml";
 const CACHE: &str = ".cache/sources";
 /// The commit the last `fetch` found, kept in the cache repository.
@@ -27,8 +29,11 @@ const SYMLINK_MODE: &str = "120000";
 pub struct Source {
     pub name: String,
     pub repository: String,
-    /// The folder in the repository that holds the skills, at any depth.
+    /// The folder in the repository to copy from: a complete plugin, or a
+    /// folder that holds skills at any depth.
     pub path: String,
+    /// `path` is a complete plugin, copied as it is.
+    pub plugin: bool,
     /// The branch to follow. The repository's default branch when absent.
     pub branch: Option<String>,
     /// The pin: the commit the library copy came from.
@@ -99,6 +104,7 @@ fn parse(text: &str) -> Result<Vec<Source>> {
             name: name.to_string(),
             repository: text("repository").with_context(|| format!("{name} has no `repository`"))?,
             path: text("path").unwrap_or_default().trim_matches('/').to_string(),
+            plugin: table.get("plugin").and_then(|value| value.as_bool()).unwrap_or(false),
             branch: text("branch"),
             commit: text("commit"),
             skills,
@@ -138,7 +144,7 @@ pub fn diff(library: &Path, source: &Source) -> Result<Diff> {
     let cache = cache_repo(library, source);
     let to = fetched(&cache, source)?;
     let (next, missing) = export(library, source, &to, "next")?;
-    let current = library.join("skills").join(&source.name);
+    let current = plugins::dir(library, &source.name);
 
     let mut diff = Diff { from: source.commit.clone(), to: to.clone(), missing, ..Default::default() };
     (diff.added, diff.removed, diff.changed) = compare(&current, &next);
@@ -173,7 +179,7 @@ pub fn diff(library: &Path, source: &Source) -> Result<Diff> {
     Ok(diff)
 }
 
-/// Replaces `skills/<source>/` with the copy at the fetched commit and moves
+/// Replaces `plugins/<source>/` with the copy at the fetched commit and moves
 /// the pin to it. Returns the new pin.
 pub fn accept(library: &Path, source: &Source) -> Result<String> {
     let cache = cache_repo(library, source);
@@ -182,15 +188,16 @@ pub fn accept(library: &Path, source: &Source) -> Result<String> {
     if !missing.is_empty() {
         bail!("{} does not have: {}. Correct `skills` in {FILE}.", source.name, missing.join(", "));
     }
-    let current = library.join("skills").join(&source.name);
+    let current = plugins::dir(library, &source.name);
     let previous = stage_dir(library, source, "previous");
     remove_dir(&previous)?;
     if current.is_dir() {
         fs::rename(&current, &previous).with_context(|| format!("cannot move {}", current.display()))?;
     }
-    fs::create_dir_all(library.join("skills"))?;
+    fs::create_dir_all(library.join("plugins"))?;
     fs::rename(&next, &current).with_context(|| format!("cannot write {}", current.display()))?;
     set_pin(library, &source.name, &to)?;
+    plugins::sync(library)?;
     Ok(to)
 }
 
@@ -228,8 +235,8 @@ fn git(repo: &Path, args: &[&str]) -> Result<String> {
     Ok(String::from_utf8_lossy(&output.stdout).trim().to_string())
 }
 
-/// Writes the source's skills at `commit` to a stage folder in the cache, in
-/// the layout of `skills/<source>/`. Returns the folder and the named skills
+/// Writes the source at `commit` to a stage folder in the cache, in the
+/// layout of `plugins/<source>/`. Returns the folder and the named skills
 /// that the source does not have.
 fn export(library: &Path, source: &Source, commit: &str, stage: &str) -> Result<(PathBuf, Vec<String>)> {
     let cache = cache_repo(library, source);
@@ -248,69 +255,84 @@ fn export(library: &Path, source: &Source, commit: &str, stage: &str) -> Result<
         .filter_map(|entry| entry.split_once('\t'))
         .map(|(meta, path)| (meta.split(' ').next().unwrap_or_default(), path))
         .collect();
-
-    let mut dirs: BTreeMap<String, String> = BTreeMap::new();
-    for (_, path) in &entries {
-        let Some(dir) = path.strip_suffix("/SKILL.md") else { continue };
-        let name = dir.rsplit('/').next().unwrap_or(dir).to_string();
-        if !is_plain_name(&name) {
-            bail!("{}: `{dir}` is not a plain skill folder name", source.name);
-        }
-        if let Some(other) = dirs.insert(name.clone(), dir.to_string()) {
-            bail!("{} has two skills named {name}: {other} and {dir}", source.name);
-        }
-    }
-    let missing = match &source.skills {
-        Some(wanted) => {
-            let wanted: BTreeSet<&String> = wanted.iter().collect();
-            let missing = wanted.iter().filter(|name| !dirs.contains_key(**name)).map(|name| name.to_string()).collect();
-            dirs.retain(|name, _| wanted.contains(name));
-            missing
-        }
-        None => Vec::new(),
+    // A link in a copied folder can point at any file on this machine.
+    let refuse_links = |dir: &str| match entries.iter().find(|(mode, path)| *mode == SYMLINK_MODE && path.starts_with(&format!("{dir}/"))) {
+        Some((_, link)) => bail!("{}: {link} is a symbolic link. The library does not copy links.", source.name),
+        None => Ok(()),
     };
 
-    for (name, dir) in &dirs {
-        let prefix = format!("{dir}/");
-        // A link in a skill folder can point at any file on this machine.
-        if let Some((_, link)) = entries.iter().find(|(mode, path)| *mode == SYMLINK_MODE && path.starts_with(&prefix)) {
-            bail!("{}: {link} is a symbolic link. The library does not copy links.", source.name);
+    let mut missing = Vec::new();
+    if source.plugin {
+        let manifest = |file: &str| entries.iter().any(|(_, path)| *path == format!("{}/{file}", source.path));
+        if !manifest(plugins::CLAUDE_MANIFEST) && !manifest(plugins::CODEX_MANIFEST) {
+            bail!("{}: `{}` is not a plugin. It has no plugin.json.", source.name, source.path);
         }
-        let target = out.join(name);
-        fs::create_dir_all(&target)?;
-        let mut archive = Command::new("git")
-            .arg("--git-dir")
-            .arg(&cache)
-            .args(["archive", "--format=tar", &format!("{commit}:{dir}")])
-            .stdout(Stdio::piped())
-            .spawn()
-            .context("cannot run git")?;
-        let unpacked = Command::new("tar")
-            .arg("-xf")
-            .arg("-")
-            .arg("-C")
-            .arg(&target)
-            .stdin(archive.stdout.take().context("git archive has no output")?)
-            .status()
-            .context("cannot run tar")?;
-        if !archive.wait()?.success() || !unpacked.success() {
-            bail!("cannot copy {dir} from {}", source.name);
+        refuse_links(&source.path)?;
+        unpack(&cache, commit, &source.path, &out)?;
+    } else {
+        let mut dirs: BTreeMap<String, String> = BTreeMap::new();
+        for (_, path) in &entries {
+            let Some(dir) = path.strip_suffix("/SKILL.md") else { continue };
+            let name = dir.rsplit('/').next().unwrap_or(dir).to_string();
+            if !is_plain_name(&name) {
+                bail!("{}: `{dir}` is not a plain skill folder name", source.name);
+            }
+            if let Some(other) = dirs.insert(name.clone(), dir.to_string()) {
+                bail!("{} has two skills named {name}: {other} and {dir}", source.name);
+            }
         }
+        if let Some(wanted) = &source.skills {
+            let wanted: BTreeSet<&String> = wanted.iter().collect();
+            missing = wanted.iter().filter(|name| !dirs.contains_key(**name)).map(|name| name.to_string()).collect();
+            dirs.retain(|name, _| wanted.contains(name));
+        }
+        for (name, dir) in &dirs {
+            refuse_links(dir)?;
+            unpack(&cache, commit, dir, &out.join("skills").join(name))?;
+        }
+        plugins::write_manifests(&out, &source.name, &format!("Skills from {}, pinned in sources.toml.", source.repository))?;
     }
 
-    for license in LICENSE_FILES {
-        if let Ok(text) = git(&cache, &["show", &format!("{commit}:{license}")]) {
-            fs::write(out.join("LICENSE"), text + "\n")?;
-            break;
+    if !out.join("LICENSE").exists() {
+        for license in LICENSE_FILES {
+            if let Ok(text) = git(&cache, &["show", &format!("{commit}:{license}")]) {
+                fs::write(out.join("LICENSE"), text + "\n")?;
+                break;
+            }
         }
     }
     Ok((out, missing))
 }
 
+/// Copies the folder `dir` of the repository at `commit` to `target`.
+fn unpack(cache: &Path, commit: &str, dir: &str, target: &Path) -> Result<()> {
+    fs::create_dir_all(target)?;
+    let mut archive = Command::new("git")
+        .arg("--git-dir")
+        .arg(cache)
+        .args(["archive", "--format=tar", &format!("{commit}:{dir}")])
+        .stdout(Stdio::piped())
+        .spawn()
+        .context("cannot run git")?;
+    let unpacked = Command::new("tar")
+        .arg("-xf")
+        .arg("-")
+        .arg("-C")
+        .arg(target)
+        .stdin(archive.stdout.take().context("git archive has no output")?)
+        .status()
+        .context("cannot run tar")?;
+    if !archive.wait()?.success() || !unpacked.success() {
+        bail!("cannot copy {dir}");
+    }
+    Ok(())
+}
+
 // ---------- compare ----------
 
-/// Skill folders in `to` and not in `from`, in `from` and not in `to`, and
-/// in both with different files.
+/// The parts in `to` and not in `from`, in `from` and not in `to`, and in
+/// both with different files. A part is one skill, or one other top-level
+/// entry of the plugin folder.
 fn compare(from: &Path, to: &Path) -> (Vec<String>, Vec<String>, Vec<String>) {
     let (from, to) = (tree(from), tree(to));
     let added = to.keys().filter(|name| !from.contains_key(*name)).cloned().collect();
@@ -323,17 +345,19 @@ fn compare(from: &Path, to: &Path) -> (Vec<String>, Vec<String>, Vec<String>) {
     (added, removed, changed)
 }
 
-/// Top-level entry name to its files' contents, by relative path.
+/// Part name to its files' contents, by path.
 fn tree(dir: &Path) -> BTreeMap<String, BTreeMap<String, Vec<u8>>> {
-    let mut out = BTreeMap::new();
-    for entry in fs::read_dir(dir).into_iter().flatten().flatten() {
-        let name = entry.file_name().to_string_lossy().into_owned();
-        if name == ".DS_Store" {
-            continue;
-        }
-        let mut files = BTreeMap::new();
-        read_files(&entry.path(), "", &mut files);
-        out.insert(name, files);
+    let mut files = BTreeMap::new();
+    read_files(dir, "", &mut files);
+    let mut out: BTreeMap<String, BTreeMap<String, Vec<u8>>> = BTreeMap::new();
+    for (path, bytes) in files {
+        let mut parts = path.split('/');
+        let part = match (parts.next(), parts.next()) {
+            (Some("skills"), Some(skill)) => skill,
+            (Some(top), _) => top,
+            (None, _) => continue,
+        };
+        out.entry(part.to_string()).or_default().insert(path, bytes);
     }
     out
 }
@@ -343,10 +367,11 @@ fn read_files(path: &Path, rel: &str, out: &mut BTreeMap<String, Vec<u8>>) {
         for entry in fs::read_dir(path).into_iter().flatten().flatten() {
             let name = entry.file_name().to_string_lossy().into_owned();
             if name != ".DS_Store" {
-                read_files(&entry.path(), &format!("{rel}/{name}"), out);
+                let rel = if rel.is_empty() { name } else { format!("{rel}/{name}") };
+                read_files(&entry.path(), &rel, out);
             }
         }
-    } else {
+    } else if !rel.is_empty() {
         out.insert(rel.to_string(), fs::read(path).unwrap_or_default());
     }
 }
@@ -441,13 +466,13 @@ mod tests {
         let first = fetch(&library, &source).unwrap();
 
         let diff = diff(&library, &source).unwrap();
-        assert_eq!(diff.added, ["LICENSE", "one", "two"]);
+        assert_eq!(diff.added, [".claude-plugin", ".codex-plugin", "LICENSE", "one", "two"]);
         assert!(diff.patch.contains("+one v1"));
-        assert!(!library.join("skills").exists(), "diff wrote to the library");
+        assert!(!library.join("plugins").exists(), "diff wrote to the library");
 
         assert_eq!(accept(&library, &source).unwrap(), first);
-        assert_eq!(read(&library, "skills/up/one/SKILL.md"), "one v1");
-        assert_eq!(read(&library, "skills/up/two/extra.md"), "extra");
+        assert_eq!(read(&library, "plugins/up/skills/one/SKILL.md"), "one v1");
+        assert_eq!(read(&library, "plugins/up/skills/two/extra.md"), "extra");
         let source = find(&library, "up").unwrap();
         assert_eq!(source.commit.as_deref(), Some(first.as_str()));
         assert!(read(&library, FILE).starts_with("# kept\n"), "accept dropped a comment");
@@ -461,17 +486,17 @@ mod tests {
         let second = fetch(&library, &source).unwrap();
         let diff = super::diff(&library, &source).unwrap();
         assert_eq!((diff.added, diff.removed, diff.changed), (vec!["three".to_string()], vec!["two".to_string()], vec!["one".to_string()]));
-        assert_eq!(read(&library, "skills/up/one/SKILL.md"), "one v1", "diff wrote to the library");
+        assert_eq!(read(&library, "plugins/up/skills/one/SKILL.md"), "one v1", "diff wrote to the library");
 
         assert_eq!(accept(&library, &source).unwrap(), second);
-        assert_eq!(read(&library, "skills/up/one/SKILL.md"), "one v2");
-        assert!(!library.join("skills/up/two").exists());
+        assert_eq!(read(&library, "plugins/up/skills/one/SKILL.md"), "one v2");
+        assert!(!library.join("plugins/up/skills/two").exists());
 
         // A second accept changes nothing.
         let source = find(&library, "up").unwrap();
         assert!(super::diff(&library, &source).unwrap().is_empty());
         assert_eq!(accept(&library, &source).unwrap(), second);
-        assert_eq!(read(&library, "skills/up/three/SKILL.md"), "three v1");
+        assert_eq!(read(&library, "plugins/up/skills/three/SKILL.md"), "three v1");
     }
 
     #[test]
@@ -482,7 +507,7 @@ mod tests {
         commit(&upstream, &[("skills/a/one/SKILL.md", "one v2")], &[]);
         // Not fetched again: the newer commit must not enter.
         assert_eq!(accept(&library, &source).unwrap(), first);
-        assert_eq!(read(&library, "skills/up/one/SKILL.md"), "one v1");
+        assert_eq!(read(&library, "plugins/up/skills/one/SKILL.md"), "one v1");
     }
 
     #[test]
@@ -491,16 +516,16 @@ mod tests {
         let source = find(&library, "up").unwrap();
         fetch(&library, &source).unwrap();
         let diff = diff(&library, &source).unwrap();
-        assert_eq!(diff.added, ["LICENSE", "two"]);
+        assert_eq!(diff.added, [".claude-plugin", ".codex-plugin", "LICENSE", "two"]);
         assert_eq!(diff.missing, ["gone"]);
         assert!(accept(&library, &source).is_err(), "accept took a list with a missing skill");
 
         fs::write(library.join(FILE), read(&library, FILE).replace(", \"gone\"", "")).unwrap();
         let source = find(&library, "up").unwrap();
         accept(&library, &source).unwrap();
-        assert!(!library.join("skills/up/one").exists());
+        assert!(!library.join("plugins/up/skills/one").exists());
 
-        fs::write(library.join("skills/up/two/SKILL.md"), "edited here").unwrap();
+        fs::write(library.join("plugins/up/skills/two/SKILL.md"), "edited here").unwrap();
         let source = find(&library, "up").unwrap();
         let diff = super::diff(&library, &source).unwrap();
         assert_eq!(diff.edited_here, ["two"]);
@@ -516,6 +541,24 @@ mod tests {
         fetch(&library, &source).unwrap();
         assert!(diff(&library, &source).is_err());
         assert!(accept(&library, &source).is_err());
-        assert!(!library.join("skills").exists());
+        assert!(!library.join("plugins").exists());
+    }
+
+    #[test]
+    fn a_complete_plugin_is_copied_as_it_is() {
+        let (upstream, library) = fixture("plugin", "");
+        commit(&upstream, &[("pack/.claude-plugin/plugin.json", "{\"name\":\"up\"}"), ("pack/skills/one/SKILL.md", "one"), ("pack/agents/helper.md", "helper"), ("pack/hooks/start.sh", "#!/bin/sh")], &[]);
+        fs::write(library.join(FILE), read(&library, FILE).replace("path = \"skills\"", "path = \"pack\"\nplugin = true")).unwrap();
+        let source = find(&library, "up").unwrap();
+        fetch(&library, &source).unwrap();
+        assert_eq!(diff(&library, &source).unwrap().added, [".claude-plugin", "LICENSE", "agents", "hooks", "one"]);
+        accept(&library, &source).unwrap();
+        assert_eq!(read(&library, "plugins/up/.claude-plugin/plugin.json"), "{\"name\":\"up\"}", "accept wrote over the plugin's own manifest");
+        assert_eq!(read(&library, "plugins/up/agents/helper.md"), "helper");
+        assert!(!library.join("plugins/up/.codex-plugin").exists());
+
+        // A folder that is not a plugin is refused.
+        fs::write(library.join(FILE), read(&library, FILE).replace("path = \"pack\"", "path = \"skills\"")).unwrap();
+        assert!(diff(&library, &find(&library, "up").unwrap()).is_err());
     }
 }

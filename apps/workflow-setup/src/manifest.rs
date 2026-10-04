@@ -1,7 +1,4 @@
-//! `manifest.toml`: which bundles go to global scope and to each project.
-//!
-//! A bundle is a named set of items. An item is `<origin>/<name>`, or
-//! `<origin>/*` for every item of that origin.
+//! `manifest.toml`: which plugins go to global scope and to each project.
 
 use std::{
     collections::BTreeMap,
@@ -12,18 +9,17 @@ use std::{
 use anyhow::{Context as _, Result, bail};
 use toml_edit::{DocumentMut, Item as Toml, Table};
 
-use crate::{adapters::Harness, library::Item};
+use crate::adapters::Harness;
 
 pub const FILE: &str = "manifest.toml";
 pub const GLOBAL: &str = "global";
 
 #[derive(Debug, Default)]
 pub struct Manifest {
-    pub bundles: BTreeMap<String, Vec<String>>,
     pub scopes: Vec<Scope>,
 }
 
-/// One place that receives bundles: the home folder, or one project.
+/// One place that receives plugins: the home folder, or one project.
 #[derive(Clone, Debug)]
 pub struct Scope {
     /// `global`, or the project path as the manifest gives it.
@@ -31,14 +27,10 @@ pub struct Scope {
     pub root: PathBuf,
     pub global: bool,
     pub harnesses: Vec<Harness>,
-    /// Bundles for every harness of the scope.
-    pub bundles: Vec<String>,
-    /// More bundles, for one harness only.
+    /// Plugins for every harness of the scope.
+    pub plugins: Vec<String>,
+    /// More plugins, for one harness only.
     pub only: BTreeMap<Harness, Vec<String>>,
-    /// Single items added to the bundles, for every harness.
-    pub items: Vec<String>,
-    /// Single items taken out of the bundles, for every harness.
-    pub without: Vec<String>,
 }
 
 impl Scope {
@@ -51,11 +43,22 @@ impl Scope {
             root,
             global,
             harnesses: Vec::new(),
-            bundles: Vec::new(),
+            plugins: Vec::new(),
             only: BTreeMap::new(),
-            items: Vec::new(),
-            without: Vec::new(),
         }
+    }
+
+    /// The plugins this scope assigns to `harness`, each one time.
+    pub fn plugins_for(&self, harness: Harness) -> Vec<String> {
+        let mut plugins = Vec::new();
+        if self.harnesses.contains(&harness) {
+            for plugin in self.plugins.iter().chain(self.only.get(&harness).into_iter().flatten()) {
+                if !plugins.contains(plugin) {
+                    plugins.push(plugin.clone());
+                }
+            }
+        }
+        plugins
     }
 }
 
@@ -71,13 +74,8 @@ pub fn load(library: &Path, home: &Path) -> Result<Manifest> {
 fn parse(text: &str, home: &Path) -> Result<Manifest> {
     let document: DocumentMut = text.parse().with_context(|| format!("{FILE} is not valid TOML"))?;
     let mut manifest = Manifest::default();
-    if let Some(bundles) = document.get("bundles").and_then(Toml::as_table) {
-        for (name, items) in bundles.iter() {
-            manifest.bundles.insert(name.to_string(), strings(items, name)?);
-        }
-    }
     if let Some(table) = document.get(GLOBAL).and_then(Toml::as_table) {
-        manifest.scopes.push(scope(GLOBAL, home.to_path_buf(), true, table, &manifest.bundles)?);
+        manifest.scopes.push(scope(GLOBAL, home.to_path_buf(), true, table)?);
     }
     if let Some(projects) = document.get("project").and_then(Toml::as_table) {
         for (path, table) in projects.iter() {
@@ -89,13 +87,13 @@ fn parse(text: &str, home: &Path) -> Result<Manifest> {
             if !root.is_absolute() {
                 bail!("project `{path}` in {FILE} must be an absolute path or start with ~/");
             }
-            manifest.scopes.push(scope(path, root, false, table, &manifest.bundles)?);
+            manifest.scopes.push(scope(path, root, false, table)?);
         }
     }
     Ok(manifest)
 }
 
-fn scope(label: &str, root: PathBuf, global: bool, table: &Table, bundles: &BTreeMap<String, Vec<String>>) -> Result<Scope> {
+fn scope(label: &str, root: PathBuf, global: bool, table: &Table) -> Result<Scope> {
     let list = |key: &str| match table.get(key) {
         Some(items) => strings(items, key),
         None => Ok(Vec::new()),
@@ -112,29 +110,15 @@ fn scope(label: &str, root: PathBuf, global: bool, table: &Table, bundles: &BTre
         let extra = list(harness.key())?;
         if !extra.is_empty() {
             if !harnesses.contains(&harness) {
-                bail!("{label}: `{}` has bundles, but `harnesses` does not name it", harness.key());
+                bail!("{label}: `{}` has plugins, but `harnesses` does not name it", harness.key());
             }
             only.insert(harness, extra);
         }
     }
-    let scope = Scope {
-        label: label.to_string(),
-        root,
-        global,
-        harnesses,
-        bundles: list("bundles")?,
-        only,
-        items: list("items")?,
-        without: list("without")?,
-    };
+    let scope = Scope { label: label.to_string(), root, global, harnesses, plugins: list("plugins")?, only };
     for harness in &scope.harnesses {
-        if harness.skill_dir(global).is_none() {
-            bail!("{label}: workflow-setup does not install skills for {} at this scope", harness.key());
-        }
-    }
-    for name in scope.bundles.iter().chain(scope.only.values().flatten()) {
-        if !bundles.contains_key(name) {
-            bail!("{label}: {FILE} has no bundle named {name}");
+        if global && !harness.installs_globally() {
+            bail!("{label}: workflow-setup does not install for {} at global scope", harness.key());
         }
     }
     Ok(scope)
@@ -148,61 +132,19 @@ fn strings(item: &Toml, name: &str) -> Result<Vec<String>> {
         .collect()
 }
 
-impl Manifest {
-    /// The library items that `scope` assigns to `harness`, in the library's
-    /// order of precedence. Fails when a bundle names an item that the
-    /// library does not have.
-    pub fn items(&self, scope: &Scope, harness: Harness, library: &[Item]) -> Result<Vec<Item>> {
-        let extra = scope.only.get(&harness).into_iter().flatten();
-        let patterns: Vec<&String> = scope
-            .bundles
-            .iter()
-            .chain(extra)
-            .flat_map(|bundle| self.bundles.get(bundle).into_iter().flatten())
-            .chain(&scope.items)
-            .collect();
-        for pattern in &patterns {
-            let Some((origin, name)) = pattern.split_once('/') else {
-                bail!("`{pattern}` in {FILE} is not `<origin>/<name>`");
-            };
-            if !library.iter().any(|item| item.origin == origin && (name == "*" || item.name == name)) {
-                bail!("{FILE} names {pattern}, which the library does not have");
-            }
-        }
-        Ok(library
-            .iter()
-            .filter(|item| patterns.iter().any(|pattern| matches(pattern, item)))
-            .filter(|item| !scope.without.iter().any(|pattern| matches(pattern, item)))
-            .cloned()
-            .collect())
-    }
-}
-
-fn matches(pattern: &str, item: &Item) -> bool {
-    pattern == format!("{}/*", item.origin) || pattern == format!("{}/{}", item.origin, item.name)
-}
-
-/// Assigns `item` (`<origin>/<name>`) to the scope at `root`, or takes it
-/// out, for every harness of the scope. Writes `manifest.toml` and keeps its
+/// Assigns `plugin` to the scope at `root` for every harness of the scope,
+/// or takes it out for all of them. Writes `manifest.toml` and keeps its
 /// comments. A project that the manifest does not have gets a table.
-pub fn assign(library: &Path, home: &Path, root: &Path, item: &str, on: bool) -> Result<()> {
+pub fn assign(library: &Path, home: &Path, root: &Path, plugin: &str, on: bool) -> Result<()> {
     let path = library.join(FILE);
     let text = fs::read_to_string(&path).unwrap_or_default();
     let manifest = parse(&text, home)?;
     let mut document: DocumentMut = text.parse().with_context(|| format!("{FILE} is not valid TOML"))?;
 
-    let known = manifest.scopes.iter().find(|scope| scope.root == root);
-    let covered = known.is_some_and(|scope| {
-        let bundles = scope.bundles.iter().chain(scope.only.values().flatten());
-        let (origin, _) = item.split_once('/').unwrap_or_default();
-        bundles
-            .flat_map(|bundle| manifest.bundles.get(bundle).into_iter().flatten())
-            .any(|pattern| pattern == item || *pattern == format!("{origin}/*"))
-    });
     let table = if root == home {
         document.entry(GLOBAL).or_insert(toml_edit::table())
     } else {
-        let label = match known {
+        let label = match manifest.scopes.iter().find(|scope| scope.root == root) {
             Some(scope) => scope.label.clone(),
             None => match root.strip_prefix(home) {
                 Ok(rest) => format!("~/{}", rest.display()),
@@ -210,26 +152,26 @@ pub fn assign(library: &Path, home: &Path, root: &Path, item: &str, on: bool) ->
             },
         };
         let projects = document.entry("project").or_insert(toml_edit::table());
-        if let Some(projects) = projects.as_table_mut() {
-            projects.set_implicit(true);
-        }
-        projects.as_table_mut().context("`project` is not a table")?.entry(&label).or_insert(toml_edit::table())
+        let projects = projects.as_table_mut().context("`project` is not a table")?;
+        projects.set_implicit(true);
+        projects.entry(&label).or_insert(toml_edit::table())
     };
     let table = table.as_table_mut().context("the scope is not a table")?;
 
-    // `items` adds to the bundles and `without` takes out of them.
-    let (add_to, drop_from, needed) = if on { ("items", "without", !covered) } else { ("without", "items", covered) };
-    if let Some(list) = table.get_mut(drop_from).and_then(Toml::as_array_mut) {
-        list.retain(|value| value.as_str() != Some(item));
-        if list.is_empty() {
-            table.remove(drop_from);
+    if on {
+        let list = table.entry("plugins").or_insert(toml_edit::value(toml_edit::Array::new()));
+        let list = list.as_array_mut().context("`plugins` is not a list")?;
+        if !list.iter().any(|value| value.as_str() == Some(plugin)) {
+            list.push(plugin);
         }
-    }
-    if needed {
-        let list = table.entry(add_to).or_insert(toml_edit::value(toml_edit::Array::new()));
-        let list = list.as_array_mut().with_context(|| format!("`{add_to}` is not a list"))?;
-        if !list.iter().any(|value| value.as_str() == Some(item)) {
-            list.push(item);
+    } else {
+        for key in std::iter::once("plugins").chain(Harness::ALL.iter().map(|harness| harness.key())) {
+            if let Some(list) = table.get_mut(key).and_then(Toml::as_array_mut) {
+                list.retain(|value| value.as_str() != Some(plugin));
+                if list.is_empty() && key != "plugins" {
+                    table.remove(key);
+                }
+            }
         }
     }
     fs::write(&path, document.to_string()).with_context(|| format!("cannot write {}", path.display()))
@@ -239,40 +181,34 @@ pub fn assign(library: &Path, home: &Path, root: &Path, item: &str, on: bool) ->
 mod tests {
     use super::*;
 
-    fn item(origin: &str, name: &str) -> Item {
-        Item { name: name.into(), origin: origin.into(), dir: PathBuf::new() }
-    }
-
     #[test]
-    fn a_toggle_adds_to_the_bundles_or_takes_out_of_them() {
+    fn a_switch_assigns_a_plugin_or_takes_it_out() {
         let root = std::env::temp_dir().join(format!("workflow-setup-manifest-{}", std::process::id()));
         fs::remove_dir_all(&root).ok();
         let (library, home) = (root.join("library"), root.join("home"));
         fs::create_dir_all(&library).unwrap();
-        fs::write(library.join(FILE), "# kept\n[bundles]\ncore = [\"h00man/*\"]\n\n[global]\nbundles = [\"core\"]\n").unwrap();
-        let skills = [item("h00man", "plan"), item("h00man", "ship"), item("matt", "teach")];
-        let names = |root: &Path| -> Vec<String> {
+        fs::write(library.join(FILE), "# kept\n[global]\nplugins = [\"h00man\"]\nclaude = [\"pstack\"]\n").unwrap();
+        let plugins = |root: &Path, harness: Harness| -> Vec<String> {
             let manifest = load(&library, &home).unwrap();
-            let Some(scope) = manifest.scopes.iter().find(|scope| scope.root == root) else { return Vec::new() };
-            manifest.items(scope, Harness::Claude, &skills).unwrap().into_iter().map(|item| item.name).collect()
+            manifest.scopes.iter().find(|scope| scope.root == root).map(|scope| scope.plugins_for(harness)).unwrap_or_default()
         };
+        assert_eq!(plugins(&home, Harness::Claude), ["h00man", "pstack"]);
+        assert_eq!(plugins(&home, Harness::Codex), ["h00man"]);
+        assert_eq!(plugins(&home, Harness::OpenCode), Vec::<String>::new(), "a harness the scope does not name got plugins");
 
-        // Out of a bundle, then in again: the file returns to what it was.
-        let before = fs::read_to_string(library.join(FILE)).unwrap();
-        assign(&library, &home, &home, "h00man/ship", false).unwrap();
-        assert_eq!(names(&home), ["plan"]);
-        assign(&library, &home, &home, "h00man/ship", true).unwrap();
-        assert_eq!(names(&home), ["plan", "ship"]);
-        assert_eq!(fs::read_to_string(library.join(FILE)).unwrap(), before);
+        // Out takes the plugin from every harness of the scope.
+        assign(&library, &home, &home, "pstack", false).unwrap();
+        assert_eq!(plugins(&home, Harness::Claude), ["h00man"]);
+        assign(&library, &home, &home, "matt", true).unwrap();
+        assign(&library, &home, &home, "matt", true).unwrap();
+        assert_eq!(plugins(&home, Harness::Codex), ["h00man", "matt"]);
+        assert!(fs::read_to_string(library.join(FILE)).unwrap().starts_with("# kept\n"));
 
-        // An item that no bundle has, in a project that the manifest does not have.
+        // A project that the manifest does not have gets a table.
         let app = home.join("app");
-        assign(&library, &home, &app, "matt/teach", true).unwrap();
-        assign(&library, &home, &app, "matt/teach", true).unwrap();
-        assert_eq!(names(&app), ["teach"]);
-        assert!(fs::read_to_string(library.join(FILE)).unwrap().contains("[project.\"~/app\"]\nitems = [\"matt/teach\"]"));
-        assign(&library, &home, &app, "matt/teach", false).unwrap();
-        assert_eq!(names(&app), Vec::<String>::new());
-        assert_eq!(names(&home), ["plan", "ship"]);
+        assign(&library, &home, &app, "matt", true).unwrap();
+        assert_eq!(plugins(&app, Harness::Claude), ["matt"]);
+        assert!(fs::read_to_string(library.join(FILE)).unwrap().contains("[project.\"~/app\"]\nplugins = [\"matt\"]"));
+        assert_eq!(plugins(&home, Harness::Codex), ["h00man", "matt"]);
     }
 }

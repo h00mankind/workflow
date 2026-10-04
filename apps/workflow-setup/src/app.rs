@@ -130,7 +130,7 @@ pub struct Manager {
     selected: [Option<String>; 5],
     /// The drift of every scope, or why the engine cannot give it.
     plans: Result<Vec<Plan>, String>,
-    /// The items (`<origin>/<name>`) the manifest assigns to the open project.
+    /// The plugins the manifest assigns to the open project.
     assigned: BTreeSet<String>,
     filter: Entity<TextInput>,
     editor: Entity<CodeEditor>,
@@ -239,7 +239,7 @@ impl Manager {
         self.plans.as_ref().ok()?.iter().find(|plan| plan.scope.root.to_string_lossy() == key)
     }
 
-    /// Assigns a library skill to the open project in the manifest, or takes
+    /// Assigns a library plugin to the open project in the manifest, or takes
     /// it out, then makes that project match.
     fn assign(&mut self, item: String, on: bool, cx: &mut Context<Self>) {
         let (Some(env), Some(root)) = (self.env(), self.project.as_ref().map(|project| project.root.clone())) else { return };
@@ -828,7 +828,7 @@ impl Manager {
             if installs.is_empty() && ix < SKILL_TARGETS {
                 let link = project.root.join(rel_dir).join(&skill.name);
                 let (name, label) = (skill.name.clone(), tool.label());
-                let button = match skill.library.clone() {
+                let button = match skill.library.clone().filter(|_| skill.origin.is_empty()) {
                     Some(library) => Button::new(("install", ix), "Install")
                         .size(ControlSize::Sm)
                         .icon(IconName::Plus)
@@ -836,7 +836,8 @@ impl Manager {
                             let result = ops::link(&library, &link).map(|()| format!("Installed {name} for {label}"));
                             this.finish(result, cx);
                         })),
-                    None => Button::new(("install", ix), "Not in the library").size(ControlSize::Sm).disabled(true),
+                    None if skill.origin.is_empty() => Button::new(("install", ix), "Not in the library").size(ControlSize::Sm).disabled(true),
+                    None => Button::new(("install", ix), "Use the switch").size(ControlSize::Sm).disabled(true),
                 };
                 table = table.row([
                     tool.label().into_any_element(),
@@ -864,6 +865,8 @@ impl Manager {
                         .size(ControlSize::Sm)
                         .variant(ButtonVariant::Ghost)
                         .icon(IconName::Trash2)
+                        // A skill in a plugin leaves with its plugin, by the switch.
+                        .disabled(install.in_plugin)
                         .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
                             this.prompt = Some(Prompt::Remove(removal.clone()));
                             cx.notify();
@@ -883,10 +886,10 @@ impl Manager {
         facts = facts.item("Files", skill.files.join("  "));
 
         let toggle = (!skill.origin.is_empty()).then(|| {
-            let item = format!("{}/{}", skill.origin, skill.name);
+            let item = skill.origin.clone();
             let this = cx.entity();
             Switch::new("assigned", self.assigned.contains(&item))
-                .label(format!("Assigned to {} in manifest.toml, as {item}", if project.global { "global scope" } else { "this project" }))
+                .label(format!("The plugin {item} is assigned to {} in manifest.toml", if project.global { "global scope" } else { "this project" }))
                 .on_change(move |on, _, cx| this.update(cx, |this, cx| this.assign(item.clone(), on, cx)))
         });
 
@@ -1061,8 +1064,8 @@ impl Manager {
         }
         let mut pane = summary(&title, &state).child(actions);
         for collision in &plan.collisions {
-            pane = pane.child(Callout::new(Severity::Info).title(format!("{} has two origins", collision.name)).child(format!(
-                "{} and {} supply it. {} wins.",
+            pane = pane.child(Callout::new(Severity::Info).title(format!("{} is in two plugins", collision.name)).child(format!(
+                "{} and {} supply it. opencode has no prefix, so {} wins there.",
                 collision.winner,
                 collision.losers.join(", "),
                 collision.winner

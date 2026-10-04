@@ -1,7 +1,9 @@
-//! One adapter per harness: where the harness reads each kind of item.
+//! One adapter per harness: how the harness receives a plugin.
 //!
-//! The neutral layout is the `.agents/` convention. Codex reads it. Claude
-//! Code and opencode do not, so each gets links in its own folder.
+//! Claude Code loads a plugin from a link in its skills folder, and gives
+//! its skills the prefix `<plugin>:`. Codex installs a plugin from this
+//! library as a marketplace, and a config file enables it for a scope.
+//! opencode has no plugins, so it gets one link per skill, with no prefix.
 
 use anyhow::{Result, bail};
 
@@ -11,6 +13,10 @@ pub enum Harness {
     Codex,
     OpenCode,
 }
+
+/// Every folder, from a scope's root, in which the engine makes links or
+/// made them before. `apply` removes its own links that are not assigned.
+pub const LINK_DIRS: [&str; 3] = [".claude/skills", ".agents/skills", ".opencode/skill"];
 
 impl Harness {
     pub const ALL: [Harness; 3] = [Harness::Claude, Harness::Codex, Harness::OpenCode];
@@ -32,15 +38,18 @@ impl Harness {
         }
     }
 
-    /// The folder that holds one link per skill, from the scope's root: the
-    /// home folder for global scope, the project folder for project scope.
-    /// `None` when this adapter does not install skills at that scope.
-    pub fn skill_dir(self, global: bool) -> Option<&'static str> {
-        match self {
-            Harness::Claude => Some(".claude/skills"),
-            Harness::Codex => Some(".agents/skills"),
-            Harness::OpenCode if global => None,
-            Harness::OpenCode => Some(".opencode/skill"),
-        }
+    /// False when this adapter installs for projects only.
+    pub fn installs_globally(self) -> bool {
+        self != Harness::OpenCode
+    }
+
+    /// The folder that holds one link per plugin, from the scope's root.
+    pub fn plugin_link_dir(self) -> Option<&'static str> {
+        (self == Harness::Claude).then_some(".claude/skills")
+    }
+
+    /// The folder that holds one link per skill, from the scope's root.
+    pub fn skill_link_dir(self) -> Option<&'static str> {
+        (self == Harness::OpenCode).then_some(".opencode/skill")
     }
 }

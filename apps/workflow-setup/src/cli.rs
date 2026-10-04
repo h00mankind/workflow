@@ -17,7 +17,7 @@ workflow-setup [project-path]          open the window
 workflow-setup status [scope]          show the drift between manifest.toml and the disk
 workflow-setup apply [scope]           make the disk match manifest.toml (--dry-run: change nothing;
                                        --adopt: replace a link that something else made)
-workflow-setup library                 list the library and its name collisions
+workflow-setup library                 list the plugins, their skills, and the names two plugins share
 workflow-setup sources fetch [name]    get the newest commit of each source into the cache
 workflow-setup sources diff [name]     show what the fetched commit would change (--stat: no patch)
 workflow-setup sources accept <name>   write the copy and move the pin (--all: every source)
@@ -45,7 +45,7 @@ pub fn run(args: &[String]) -> Result<()> {
         }),
         ["sources", "accept", names @ ..] => each(names, !flag("--all"), |library, source| {
             let commit = sources::accept(library, source)?;
-            println!("{}: skills/{} is now the copy at {}", source.name, source.name, short(&commit));
+            println!("{}: plugins/{} is now the copy at {}", source.name, source.name, short(&commit));
             Ok(())
         }),
         _ => {
@@ -123,7 +123,7 @@ fn print_plan(env: &Env, plan: &Plan) {
     let root = tilde(env, &plan.scope.root);
     let title = if plan.scope.global { format!("global ({root})") } else { root };
     for collision in &plan.collisions {
-        println!("{title}: {} is assigned from {} and {}. {} wins.", collision.name, collision.winner, collision.losers.join(", "), collision.winner);
+        println!("{title}: opencode has no prefix. {} is in {} and {}. {} wins.", collision.name, collision.winner, collision.losers.join(", "), collision.winner);
     }
     if plan.in_sync() {
         println!("{title}: in sync");
@@ -142,16 +142,16 @@ fn tilde(env: &Env, path: &Path) -> String {
 fn list(library: &Path) -> Result<()> {
     let skills = library::skills(library);
     let (winners, collisions) = library::resolve(&skills);
-    for origin in library::origins(library, "skills") {
-        let names: Vec<&str> = skills.iter().filter(|skill| skill.origin == origin).map(|skill| skill.name.as_str()).collect();
-        println!("skills/{origin} ({}): {}", names.len(), names.join(" "));
+    for plugin in library::plugins(library) {
+        let names: Vec<&str> = skills.iter().filter(|skill| skill.origin == plugin).map(|skill| skill.name.as_str()).collect();
+        println!("plugins/{plugin} ({}): {}", names.len(), names.join(" "));
     }
     for agent in library::agents(library) {
         println!("agents/{}: {}", agent.origin, agent.name);
     }
-    println!("{} skill names install.", winners.len());
+    println!("{} skills, {} names. With a prefix, every skill installs.", skills.len(), winners.len());
     for collision in &collisions {
-        println!("collision: {} is in {} and {}. {} wins.", collision.name, collision.winner, collision.losers.join(", "), collision.winner);
+        println!("same name: {} is in {} and {}. Without a prefix, {} wins.", collision.name, collision.winner, collision.losers.join(", "), collision.winner);
     }
     Ok(())
 }

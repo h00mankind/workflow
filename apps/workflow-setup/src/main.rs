@@ -11,6 +11,7 @@ mod config;
 mod library;
 mod manifest;
 mod ops;
+mod plugins;
 mod scan;
 mod sources;
 

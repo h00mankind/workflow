@@ -1,8 +1,9 @@
 //! The library: every item this repo can install, by category and origin.
 //! Read-only.
 //!
-//! Layout: `skills/<origin>/<name>/SKILL.md` and `agents/<origin>/<name>/`.
-//! The origin `h00man` holds the items edited here. Each other origin is a
+//! Layout: `plugins/<origin>/skills/<name>/SKILL.md` and
+//! `agents/<origin>/<name>/`. Each folder in `plugins/` is one plugin. The
+//! origin `h00man` holds the items edited here. Each other origin is a
 //! verbatim copy of a source in `sources.toml`.
 
 use std::{
@@ -54,11 +55,16 @@ pub fn origins(library: &Path, category: &str) -> Vec<String> {
     found
 }
 
+/// The plugins in the library, in order of precedence.
+pub fn plugins(library: &Path) -> Vec<String> {
+    origins(library, "plugins")
+}
+
 /// Every skill in the library, in order of precedence.
 pub fn skills(library: &Path) -> Vec<Item> {
     let mut items = Vec::new();
-    for origin in origins(library, "skills") {
-        for dir in sorted_dirs(&library.join("skills").join(&origin)) {
+    for origin in plugins(library) {
+        for dir in sorted_dirs(&library.join("plugins").join(&origin).join("skills")) {
             if dir.join("SKILL.md").is_file() {
                 items.push(Item { name: file_name(&dir), origin: origin.clone(), dir });
             }

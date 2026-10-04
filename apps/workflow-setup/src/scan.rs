@@ -101,6 +101,8 @@ pub struct Install {
     pub abs: PathBuf,
     pub link_target: Option<PathBuf>,
     pub broken: bool,
+    /// The skill is in a plugin folder. The plugin installs as a whole.
+    pub in_plugin: bool,
     hash: Option<u64>,
 }
 
@@ -497,23 +499,49 @@ fn fill_skill(skill: &mut Skill, dir: &Path, text: String) {
 
 fn scan_skills(root: &Path, library: Option<&Path>) -> Vec<Skill> {
     let lock = read_json(&root.join("skills-lock.json"));
+    let in_library = library.map(library::skills).unwrap_or_default();
     let mut by_name: BTreeMap<String, Skill> = BTreeMap::new();
 
     for &(rel_dir, tool) in SKILL_DIRS {
         for abs in sorted_dir(&root.join(rel_dir)) {
+            // A plugin folder: each of its skills has the plugin's name as a prefix.
+            if abs.join(crate::plugins::CLAUDE_MANIFEST).is_file() {
+                let plugin = file_name(&abs);
+                for dir in sorted_dir(&abs.join("skills")) {
+                    let Ok(text) = fs::read_to_string(dir.join("SKILL.md")) else { continue };
+                    let skill = skill_entry(&mut by_name, format!("{plugin}:{}", file_name(&dir)));
+                    skill.installs.push(Install {
+                        tool,
+                        rel: relative(root, &dir),
+                        abs: dir.clone(),
+                        link_target: link_target(&abs),
+                        broken: false,
+                        in_plugin: true,
+                        hash: Some(hash_of(&text)),
+                    });
+                    fill_skill(skill, &dir, text);
+                }
+                continue;
+            }
             let link = link_target(&abs);
             let text = fs::read_to_string(abs.join("SKILL.md")).ok();
             let broken = link.is_some() && !abs.exists();
             if text.is_none() && !broken {
                 continue;
             }
-            let skill = skill_entry(&mut by_name, file_name(&abs));
+            // A link to a library skill is that skill, installed without its prefix.
+            let name = match in_library.iter().find(|item| Some(&item.dir) == link.as_ref()) {
+                Some(item) => format!("{}:{}", item.origin, item.name),
+                None => file_name(&abs),
+            };
+            let skill = skill_entry(&mut by_name, name);
             skill.installs.push(Install {
                 tool,
                 rel: relative(root, &abs),
                 abs: abs.clone(),
                 link_target: link,
                 broken,
+                in_plugin: false,
                 hash: text.as_deref().map(hash_of),
             });
             if let Some(text) = text {
@@ -522,16 +550,12 @@ fn scan_skills(root: &Path, library: Option<&Path>) -> Vec<Skill> {
         }
     }
 
-    if let Some(library) = library {
-        // Of two origins with one name, the library installs the winner.
-        let (winners, _) = library::resolve(&library::skills(library));
-        for item in winners.into_values() {
-            let Ok(text) = fs::read_to_string(item.dir.join("SKILL.md")) else { continue };
-            let skill = skill_entry(&mut by_name, item.name);
-            skill.library = Some(item.dir.clone());
-            skill.origin = item.origin;
-            fill_skill(skill, &item.dir, text);
-        }
+    for item in in_library {
+        let Ok(text) = fs::read_to_string(item.dir.join("SKILL.md")) else { continue };
+        let skill = skill_entry(&mut by_name, format!("{}:{}", item.origin, item.name));
+        skill.library = Some(item.dir.clone());
+        skill.origin = item.origin;
+        fill_skill(skill, &item.dir, text);
     }
 
     let mut skills: Vec<Skill> = by_name.into_values().collect();
