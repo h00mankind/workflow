@@ -14,6 +14,7 @@ mcp/                 one definition file per MCP server
 scripts/             statusline, notifications, hooks
 instructions/        shared AGENTS.md and CLAUDE.md parts
 sources.toml         per source: repository, path, pinned commit
+manifest.toml        which bundles go to global scope and to each project
 apps/workflow-setup  the engine: one window and one command line
 ```
 
@@ -34,6 +35,19 @@ workflow-setup library                # list the library and its name collisions
 ```
 
 Only `accept` changes the library. It takes the commit that the last `fetch` found, which is the commit that `diff` showed. To add a source, add a table to `sources.toml`, then fetch, diff, and accept.
+
+## Manifest and apply
+
+`manifest.toml` names bundles (sets of items) and assigns them to `[global]` and to each `[project."<path>"]`. Skills install as links: `.agents/skills/` for Codex, `.claude/skills/` for Claude Code, `.opencode/skill/` for opencode.
+
+```bash
+workflow-setup status                 # the drift between manifest.toml and the disk, for every scope
+workflow-setup apply --dry-run        # the same, as the changes apply would make
+workflow-setup apply                  # make the disk match
+workflow-setup apply global --adopt   # also replace links that something else made
+```
+
+`apply` owns a link when its record has it, or when the link points into this library. It never changes or removes an item it does not own: a link that something else made is a conflict until `--adopt`, and a real file or folder is never replaced. Before it replaces or removes a link, it writes the old target to a backup. The record and the backups are in `~/Library/Application Support/workflow-setup/`. A second `apply` changes nothing.
 
 ## My skills
 

@@ -4,17 +4,25 @@ use std::path::{Path, PathBuf};
 
 use anyhow::{Context as _, Result, bail};
 
-use crate::{config::Config, library, sources};
+use crate::{
+    apply::{self, Change, Env, Plan},
+    config::Config,
+    library, manifest, sources,
+};
 
-pub const COMMANDS: &[&str] = &["sources", "library", "help", "--help", "-h"];
+pub const COMMANDS: &[&str] = &["status", "apply", "sources", "library", "help", "--help", "-h"];
 
 const USAGE: &str = "\
 workflow-setup [project-path]          open the window
+workflow-setup status [scope]          show the drift between manifest.toml and the disk
+workflow-setup apply [scope]           make the disk match manifest.toml (--dry-run: change nothing;
+                                       --adopt: replace a link that something else made)
 workflow-setup library                 list the library and its name collisions
 workflow-setup sources fetch [name]    get the newest commit of each source into the cache
 workflow-setup sources diff [name]     show what the fetched commit would change (--stat: no patch)
 workflow-setup sources accept <name>   write the copy and move the pin (--all: every source)
 
+A scope is `global` or a project path from manifest.toml. Without one: every scope.
 The library is $WORKFLOW_LIBRARY, or the folder above the current one that
 has sources.toml, or the library the window uses.";
 
@@ -23,6 +31,8 @@ pub fn run(args: &[String]) -> Result<()> {
     let flag = |name: &str| args.iter().any(|arg| arg == name);
     match words.as_slice() {
         ["library"] => list(&find_library()?),
+        ["status", scopes @ ..] => status(scopes, false, false, true),
+        ["apply", scopes @ ..] => status(scopes, !flag("--dry-run"), flag("--adopt"), flag("--dry-run")),
         ["sources", "fetch", names @ ..] => each(names, false, |library, source| {
             let commit = sources::fetch(library, source)?;
             let state = if source.commit.as_deref() == Some(&commit) { "at the pin" } else { "newer than the pin" };
@@ -71,6 +81,87 @@ fn each(names: &[&str], need_name: bool, run: impl Fn(&Path, &sources::Source) -
         run(&library, source)?;
     }
     Ok(())
+}
+
+/// Prints the drift of the named scopes and, with `write`, corrects it.
+fn status(names: &[&str], write: bool, adopt: bool, show: bool) -> Result<()> {
+    let env = Env::new(find_library()?);
+    let mut plans = apply::plan_all(&env)?;
+    for name in names {
+        if !plans.iter().any(|plan| is_scope(&env, plan, name)) {
+            bail!("{} has no scope `{name}`", manifest::FILE);
+        }
+    }
+    plans.retain(|plan| names.is_empty() || names.iter().any(|name| is_scope(&env, plan, name)));
+    if !write || show {
+        for plan in &plans {
+            print_plan(&env, plan);
+        }
+    }
+    if write {
+        let (results, backup) = apply::apply(&env, &plans, adopt)?;
+        for (plan, applied) in plans.iter().zip(results) {
+            let mut line = format!("{}: {} written, {} removed", plan.scope.label, applied.written, applied.removed);
+            if applied.left > 0 {
+                line.push_str(&format!(", {} left because workflow-setup does not own them", applied.left));
+            }
+            println!("{line}");
+        }
+        if let Some(backup) = backup {
+            println!("backup: {}", tilde(&env, &backup));
+        }
+    }
+    Ok(())
+}
+
+fn is_scope(env: &Env, plan: &Plan, name: &str) -> bool {
+    let path = std::path::absolute(name).unwrap_or_default();
+    plan.scope.label == name || plan.scope.root == path || tilde(env, &plan.scope.root) == name
+}
+
+fn print_plan(env: &Env, plan: &Plan) {
+    let root = tilde(env, &plan.scope.root);
+    let title = if plan.scope.global { format!("global ({root})") } else { root };
+    for collision in &plan.collisions {
+        println!("{title}: {} is assigned from {} and {}. {} wins.", collision.name, collision.winner, collision.losers.join(", "), collision.winner);
+    }
+    if plan.in_sync() {
+        println!("{title}: in sync");
+        return;
+    }
+    println!("{title}: {} to change", plan.changes.len());
+    // One line per kind of change and folder.
+    let mut groups: Vec<(String, Vec<String>)> = Vec::new();
+    for change in &plan.changes {
+        let dir = change.path().parent().unwrap_or(&plan.scope.root);
+        let dir = dir.strip_prefix(&plan.scope.root).unwrap_or(dir).display();
+        let from = |from: &Path| tilde(env, from.parent().unwrap_or(from));
+        let label = match change {
+            Change::Link { .. } => format!("link     {dir}"),
+            Change::Relink { from: was, .. } => format!("relink   {dir}  (now links into {})", from(was)),
+            Change::Remove { from: was, .. } => format!("remove   {dir}  (links into {}, not assigned)", from(was)),
+            Change::Conflict { foreign_link: Some(was), .. } => {
+                format!("conflict {dir}  (a link into {}, not made by workflow-setup; --adopt replaces it)", from(was))
+            }
+            Change::Conflict { foreign_link: None, .. } => format!("conflict {dir}  (a real file or folder; move it away by hand)"),
+        };
+        let name = change.path().file_name().unwrap_or_default().to_string_lossy().into_owned();
+        match groups.iter_mut().find(|(group, _)| *group == label) {
+            Some((_, names)) => names.push(name),
+            None => groups.push((label, vec![name])),
+        }
+    }
+    for (label, names) in groups {
+        println!("  {label}\n    {} ({})", names.join(" "), names.len());
+    }
+}
+
+fn tilde(env: &Env, path: &Path) -> String {
+    match path.strip_prefix(&env.home) {
+        Ok(rest) if rest.as_os_str().is_empty() => "~".to_string(),
+        Ok(rest) => format!("~/{}", rest.display()),
+        Err(_) => path.display().to_string(),
+    }
 }
 
 fn list(library: &Path) -> Result<()> {

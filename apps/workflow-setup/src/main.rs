@@ -3,10 +3,13 @@
 //!   workflow-setup [project-path]   opens the window
 //!   workflow-setup help             lists the commands
 
+mod adapters;
 mod app;
+mod apply;
 mod cli;
 mod config;
 mod library;
+mod manifest;
 mod ops;
 mod scan;
 mod sources;

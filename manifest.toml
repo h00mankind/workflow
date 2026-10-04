@@ -1,0 +1,31 @@
+# What goes where. `workflow-setup status` shows the drift between this file
+# and the disk. `workflow-setup apply` corrects it.
+#
+# A bundle is a named set of items. An item is "<origin>/<name>", or
+# "<origin>/*" for every item of that origin.
+#
+# A scope is [global] (the home folder) or [project."<path>"]. In a scope:
+#   bundles    bundles for every harness of the scope
+#   claude     more bundles, for Claude Code only (also: codex, opencode)
+#   harnesses  the harnesses of the scope. Without it: claude and codex.
+
+[bundles]
+core = ["h00man/*"]
+matt = ["matt/handoff", "matt/teach", "matt/writing-for-agents"]
+pstack = ["poteto/*"]
+
+# pstack is global for Claude Code only. For Codex it stays off at global
+# scope and is enabled for each project.
+[global]
+claude = ["pstack"]
+
+[project."~/Documents/h00man.code/workflow"]
+bundles = ["core", "matt"]
+harnesses = ["claude", "codex", "opencode"]
+
+[project."~/Documents/h00man.code/mcgg"]
+bundles = ["core", "matt"]
+harnesses = ["claude", "codex", "opencode"]
+
+[project."~/Documents/h00man.code/labs-by-nexlabs"]
+bundles = ["core", "matt"]
