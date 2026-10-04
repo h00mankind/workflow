@@ -20,9 +20,10 @@ use serde::{Deserialize, Serialize};
 use toml_edit::DocumentMut;
 
 use crate::{
-    adapters::{Harness, LINK_DIRS},
+    adapters::{Harness, LINK_DIRS, mcp::Format as McpFormat},
     library,
     manifest::{self, Scope},
+    mcp,
     plugins::{self, MARKETPLACE},
 };
 
@@ -36,6 +37,8 @@ pub struct Env {
     pub data: PathBuf,
     /// Runs the `codex` command line with these arguments.
     pub codex: Box<dyn Fn(&[&str]) -> Result<()>>,
+    /// Runs the `claude` command line with these arguments.
+    pub claude: Box<dyn Fn(&[&str]) -> Result<()>>,
 }
 
 impl Env {
@@ -49,6 +52,13 @@ impl Env {
                 let output = Command::new("codex").args(args).output().context("cannot run codex")?;
                 if !output.status.success() {
                     bail!("codex {}: {}", args.join(" "), String::from_utf8_lossy(&output.stderr).trim());
+                }
+                Ok(())
+            }),
+            claude: Box::new(|args| {
+                let output = Command::new("claude").args(args).output().context("cannot run claude")?;
+                if !output.status.success() {
+                    bail!("claude mcp failed: {}", String::from_utf8_lossy(&output.stderr).trim());
                 }
                 Ok(())
             }),
@@ -84,6 +94,10 @@ pub enum Change {
     /// A Codex config file must enable or disable the plugin, or, with
     /// `None`, must not name it.
     CodexEnable { file: PathBuf, plugin: String, enabled: Option<bool> },
+    /// Writes an MCP entry, or removes it with `None`.
+    McpSet { file: PathBuf, format: McpFormat, server: String, entry: Option<serde_json::Value>, previous: Option<u64> },
+    /// An MCP entry or file that the engine must leave unchanged.
+    McpConflict { file: PathBuf, server: String, reason: String },
 }
 
 /// The drift of one scope.
@@ -143,6 +157,11 @@ impl Plan {
                     };
                     (format!("codex    {verb} {}", tilde(home, file)), plugin.clone())
                 }
+                Change::McpSet { file, server, entry, .. } => {
+                    let verb = if entry.is_some() { "write in" } else { "remove from" };
+                    (format!("mcp      {verb} {}", tilde(home, file)), server.clone())
+                }
+                Change::McpConflict { file, server, reason } => (format!("conflict {}  ({reason})", tilde(home, file)), server.clone()),
             };
             match groups.iter_mut().find(|(group, _)| *group == label) {
                 Some((_, names)) => names.push(name),
@@ -181,6 +200,9 @@ struct Record {
     /// Plugin to the hash of its content when Codex last copied it.
     #[serde(default)]
     codex: BTreeMap<String, u64>,
+    /// Config file to the MCP entries written there, each with its value hash.
+    #[serde(default)]
+    mcp: BTreeMap<PathBuf, BTreeMap<String, u64>>,
 }
 
 impl Record {
@@ -217,16 +239,73 @@ pub fn plan_all(env: &Env) -> Result<Vec<Plan>> {
         }
     }
     let known = library::plugins(&env.library);
+    let servers = mcp::load(&env.library)?;
     for scope in &scopes {
         for plugin in Harness::ALL.into_iter().flat_map(|harness| scope.plugins_for(harness)) {
             if !known.contains(&plugin) {
                 bail!("{}: {} names the plugin {plugin}, which the library does not have", scope.label, manifest::FILE);
             }
         }
+        for server in &scope.mcp {
+            if !servers.contains_key(server) {
+                bail!("{}: {} names the MCP server {server}, which the library does not have", scope.label, manifest::FILE);
+            }
+        }
     }
     // Codex keeps one copy of a plugin for all scopes.
     let codex_plugins: BTreeSet<String> = scopes.iter().flat_map(|scope| scope.plugins_for(Harness::Codex)).collect();
-    scopes.iter().map(|scope| plan(env, &record, scope, &codex_plugins)).collect()
+    scopes.iter().map(|scope| {
+        let mut plan = plan(env, &record, scope, &codex_plugins)?;
+        plan_mcp(&record, &servers, &mut plan)?;
+        Ok(plan)
+    }).collect()
+}
+
+fn plan_mcp(record: &Record, servers: &BTreeMap<String, mcp::Server>, plan: &mut Plan) -> Result<()> {
+    for config in crate::adapters::mcp::configs(&plan.scope) {
+        let desired: BTreeSet<String> = if config.assigned { plan.scope.mcp.iter().cloned().collect() } else { BTreeSet::new() };
+        let owned = record.mcp.get(&config.file).cloned().unwrap_or_default();
+        let names: BTreeSet<String> = desired.iter().chain(owned.keys()).cloned().collect();
+        if names.is_empty() {
+            continue;
+        }
+        plan.keeps_record |= !desired.is_empty();
+        let (entries, blocked) = config.format.read(&config.file)?;
+        for server in names {
+            let previous = entries.get(&server).map(hash_entry);
+            let reason = match &blocked {
+                Some(reason) => Some(reason.clone()),
+                None if previous.is_some() && !owned.contains_key(&server) => Some("the entry is not owned".to_string()),
+                None if previous.is_some() && previous != owned.get(&server).copied() => Some("the owned entry was edited outside workflow-setup".to_string()),
+                None => None,
+            };
+            if let Some(reason) = reason {
+                plan.changes.push(Change::McpConflict { file: config.file.clone(), server, reason });
+                continue;
+            }
+            let entry = desired.contains(&server).then(|| config.format.entry(&servers[&server]));
+            if entry.as_ref().map(hash_entry) != previous || (entry.is_none() && owned.contains_key(&server)) {
+                plan.changes.push(Change::McpSet { file: config.file.clone(), format: config.format, server, entry, previous });
+            }
+        }
+    }
+    Ok(())
+}
+
+fn hash_entry(entry: &serde_json::Value) -> u64 {
+    fn sorted(value: &serde_json::Value) -> serde_json::Value {
+        match value {
+            serde_json::Value::Object(values) => {
+                let values: BTreeMap<_, _> = values.iter().map(|(key, value)| (key.clone(), sorted(value))).collect();
+                serde_json::Value::Object(values.into_iter().collect())
+            }
+            serde_json::Value::Array(values) => serde_json::Value::Array(values.iter().map(sorted).collect()),
+            _ => value.clone(),
+        }
+    }
+    let mut hasher = DefaultHasher::new();
+    sorted(entry).to_string().hash(&mut hasher);
+    hasher.finish()
 }
 
 fn plan(env: &Env, record: &Record, scope: &Scope, codex_plugins: &BTreeSet<String>) -> Result<Plan> {
@@ -351,10 +430,13 @@ pub fn apply(env: &Env, plans: &[Plan], adopt: bool) -> Result<(Vec<Applied>, Op
             Change::CodexEnable { file, .. } => {
                 old_files.insert(file.clone());
             }
+            Change::McpSet { file, entry, previous, .. } if entry.is_some() || previous.is_some() => {
+                old_files.insert(file.clone());
+            }
             Change::CodexMarketplace | Change::CodexInstall { .. } | Change::CodexUninstall { .. } => {
                 old_files.insert(env.home.join(CODEX_CONFIG));
             }
-            Change::Link { .. } | Change::Conflict { .. } => {}
+            Change::Link { .. } | Change::Conflict { .. } | Change::McpConflict { .. } | Change::McpSet { .. } => {}
         }
     }
     old_files.retain(|file| file.is_file());
@@ -423,9 +505,42 @@ pub fn apply(env: &Env, plans: &[Plan], adopt: bool) -> Result<(Vec<Applied>, Op
                         None => applied.removed += 1,
                     }
                 }
+                Change::McpConflict { .. } => applied.left += 1,
+                Change::McpSet { file, format, server, entry, previous } => {
+                    let (entries, blocked) = format.read(file)?;
+                    if blocked.is_some() || entries.get(server).map(hash_entry) != *previous {
+                        applied.left += 1;
+                        continue;
+                    }
+                    format.set(file, server, entry.as_ref(), previous.is_some(), env.claude.as_ref())?;
+                    let (entries, _) = format.read(file)?;
+                    match entry {
+                        Some(entry) => {
+                            let hash = hash_entry(entry);
+                            if entries.get(server).map(hash_entry) != Some(hash) {
+                                bail!("MCP server {server} was not written in {}", file.display());
+                            }
+                            record.mcp.entry(file.clone()).or_default().insert(server.clone(), hash);
+                            applied.written += 1;
+                        }
+                        None => {
+                            if entries.contains_key(server) {
+                                bail!("MCP server {server} was not removed from {}", file.display());
+                            }
+                            if let Some(owned) = record.mcp.get_mut(file) {
+                                owned.remove(server);
+                                if owned.is_empty() {
+                                    record.mcp.remove(file);
+                                }
+                            }
+                            applied.removed += usize::from(previous.is_some());
+                        }
+                    }
+                }
             }
         }
-        if owned.is_empty() && !plan.keeps_record {
+        let owns_mcp = crate::adapters::mcp::configs(&plan.scope).iter().any(|config| record.mcp.contains_key(&config.file));
+        if owned.is_empty() && !plan.keeps_record && !owns_mcp {
             record.scopes.remove(&plan.scope.root);
         } else {
             record.scopes.insert(plan.scope.root.clone(), owned);
@@ -580,7 +695,7 @@ harnesses = ["claude", "codex", "opencode"]
                 Ok(())
             }
         };
-        Env { library, home, data: root.join("data"), codex: Box::new(codex) }
+        Env { library, home, data: root.join("data"), codex: Box::new(codex), claude: Box::new(|args| bail!("unexpected claude call: {args:?}")) }
     }
 
     fn run(env: &Env, adopt: bool) -> Vec<Applied> {
@@ -714,5 +829,249 @@ harnesses = ["claude", "codex", "opencode"]
         fs::write(env.library.join(manifest::FILE), "[global]\nplugins = [\"nope\"]\n").unwrap();
         assert!(plan_all(&env).is_err());
         assert!(!env.home.join(".claude").exists());
+    }
+
+    fn mcp_fixture(test: &str) -> Env {
+        let mut env = fixture(test);
+        fs::create_dir_all(env.library.join("mcp")).unwrap();
+        fs::write(env.library.join("mcp/local.toml"), "command = \"npx\"\nargs = [\"-y\", \"some-mcp\"]\nenv = [\"GITHUB_TOKEN\"]\n").unwrap();
+        fs::write(env.library.join("mcp/remote.toml"), "url = \"https://example.com/mcp\"\nbearer_token_env = \"EXAMPLE_TOKEN\"\n").unwrap();
+        fs::write(env.library.join(manifest::FILE), "[global]\nmcp = [\"local\", \"remote\"]\n[project.\"~/app\"]\nmcp = [\"local\", \"remote\"]\nharnesses = [\"claude\", \"codex\", \"opencode\"]\n").unwrap();
+        let file = env.home.join(".claude.json");
+        env.claude = Box::new(move |args| {
+            let mut doc: serde_json::Value = serde_json::from_str(&fs::read_to_string(&file).unwrap_or_else(|_| "{\"mcpServers\":{}}".into()))?;
+            match args {
+                ["mcp", "add-json", "--scope", "user", name, json] => {
+                    assert!(doc["mcpServers"].get(*name).is_none(), "claude add-json cannot replace an existing server");
+                    let mut entry: serde_json::Value = serde_json::from_str(json)?;
+                    if entry.get("command").is_some() {
+                        entry["type"] = serde_json::json!("stdio");
+                    }
+                    doc["mcpServers"][*name] = entry;
+                }
+                ["mcp", "remove", "--scope", "user", name] => {
+                    assert!(doc["mcpServers"].as_object_mut().unwrap().remove(*name).is_some());
+                }
+                _ => bail!("the test claude does not know {args:?}"),
+            }
+            fs::write(&file, serde_json::to_string_pretty(&doc)?)?;
+            Ok(())
+        });
+        env
+    }
+
+    fn mcp_entries(env: &Env, path: &str, format: McpFormat) -> BTreeMap<String, serde_json::Value> {
+        format.read(&env.home.join(path)).unwrap().0
+    }
+
+    const MCP_FILES: [(&str, McpFormat); 5] = [
+        (".claude.json", McpFormat::ClaudeUser),
+        (CODEX_CONFIG, McpFormat::Codex),
+        ("app/.mcp.json", McpFormat::Json),
+        ("app/.codex/config.toml", McpFormat::Codex),
+        ("app/.agents/mcp.json", McpFormat::Json),
+    ];
+
+    #[test]
+    fn mcp_installs_for_both_harnesses_in_both_scopes_and_is_idempotent() {
+        let env = mcp_fixture("mcp-twice");
+        let plans = plan_all(&env).unwrap();
+        assert_eq!(plans.iter().map(|plan| plan.changes.len()).collect::<Vec<_>>(), [4, 6]);
+        assert!(plans[0].groups(&env.home).iter().any(|(label, names)| label.contains(".claude.json") && names == &["local", "remote"]));
+        assert_eq!(run(&env, false), [Applied { written: 4, ..Applied::default() }, Applied { written: 6, ..Applied::default() }]);
+        for (file, format) in MCP_FILES {
+            let entries = mcp_entries(&env, file, format);
+            assert_eq!(entries.len(), 2, "{file}");
+            if format == McpFormat::Codex {
+                assert_eq!(entries["local"], serde_json::json!({"command": "npx", "args": ["-y", "some-mcp"], "env_vars": ["GITHUB_TOKEN"]}));
+                assert_eq!(entries["remote"], serde_json::json!({"url": "https://example.com/mcp", "bearer_token_env_var": "EXAMPLE_TOKEN"}));
+            } else {
+                assert_eq!(entries["local"], serde_json::json!({"command": "npx", "args": ["-y", "some-mcp"], "env": {"GITHUB_TOKEN": "${GITHUB_TOKEN}"}}));
+                assert_eq!(entries["remote"], serde_json::json!({"type": "http", "url": "https://example.com/mcp", "headers": {"Authorization": "Bearer ${EXAMPLE_TOKEN}"}}));
+            }
+            let record = Record::load(&env);
+            assert_eq!(record.mcp[&env.home.join(file)]["local"], hash_entry(&entries["local"]));
+        }
+        assert!(!env.home.join(".agents/mcp.json").exists());
+        assert!(!env.home.join("app/.opencode").exists());
+        assert!(in_sync(&env));
+        let before = backups(&env);
+        let (applied, backup) = apply(&env, &plan_all(&env).unwrap(), false).unwrap();
+        assert_eq!(applied, [Applied::default(), Applied::default()]);
+        assert_eq!(backup, None);
+        assert_eq!(backups(&env), before);
+    }
+
+    #[test]
+    fn mcp_updates_owned_entries_and_removes_servers_and_scopes_that_leave_the_manifest() {
+        let env = mcp_fixture("mcp-remove");
+        run(&env, false);
+        fs::write(env.library.join("mcp/local.toml"), "command = \"new-command\"\n").unwrap();
+        assert_eq!(run(&env, false).iter().map(|applied| applied.written).sum::<usize>(), 5);
+        for (file, format) in MCP_FILES {
+            assert_eq!(mcp_entries(&env, file, format)["local"]["command"], "new-command");
+        }
+        fs::write(env.library.join(manifest::FILE), "[global]\nmcp = [\"local\"]\n").unwrap();
+        assert_eq!(run(&env, false).iter().map(|applied| applied.removed).sum::<usize>(), 8);
+        for (file, format) in MCP_FILES {
+            let entries = mcp_entries(&env, file, format);
+            assert!(!entries.contains_key("remote"));
+            assert_eq!(entries.contains_key("local"), !file.starts_with("app/"));
+        }
+        let record = Record::load(&env);
+        assert!(!record.scopes.contains_key(&env.home.join("app")));
+        assert_eq!(record.mcp.len(), 2);
+        assert!(in_sync(&env));
+    }
+
+    #[test]
+    fn mcp_leaves_foreign_entries_even_when_they_match_and_adopt_is_set() {
+        let env = mcp_fixture("mcp-foreign");
+        let servers = mcp::load(&env.library).unwrap();
+        for (file, format) in MCP_FILES {
+            let path = env.home.join(file);
+            fs::create_dir_all(path.parent().unwrap()).unwrap();
+            if format == McpFormat::ClaudeUser {
+                fs::write(&path, serde_json::json!({"mcpServers": {"local": format.entry(&servers["local"])}, "other": true}).to_string()).unwrap();
+            } else {
+                format.write(&path, "local", Some(&format.entry(&servers["local"]))).unwrap();
+            }
+        }
+        let plans = plan_all(&env).unwrap();
+        assert_eq!(plans.iter().flat_map(|plan| &plan.changes).filter(|change| matches!(change, Change::McpConflict { .. })).count(), 5);
+        assert_eq!(run(&env, true).iter().map(|applied| applied.left).sum::<usize>(), 5);
+        let record = Record::load(&env);
+        for (file, format) in MCP_FILES {
+            assert_eq!(mcp_entries(&env, file, format)["local"], format.entry(&servers["local"]));
+            assert!(!record.mcp[&env.home.join(file)].contains_key("local"));
+        }
+        assert!(read(&env, ".claude.json").contains("\"other\": true"));
+    }
+
+    #[test]
+    fn mcp_leaves_externally_edited_entries_on_update_and_removal() {
+        let env = mcp_fixture("mcp-edited");
+        run(&env, false);
+        for (file, format) in MCP_FILES {
+            let path = env.home.join(file);
+            if format == McpFormat::ClaudeUser {
+                let mut doc: serde_json::Value = serde_json::from_str(&read(&env, file)).unwrap();
+                doc["mcpServers"]["local"]["command"] = serde_json::json!("by-hand");
+                fs::write(path, doc.to_string()).unwrap();
+            } else {
+                let mut entry = mcp_entries(&env, file, format)["local"].clone();
+                entry["command"] = serde_json::json!("by-hand");
+                format.write(&path, "local", Some(&entry)).unwrap();
+            }
+        }
+        let before: Vec<_> = MCP_FILES.iter().map(|(file, _)| read(&env, file)).collect();
+        assert_eq!(run(&env, true).iter().map(|applied| applied.left).sum::<usize>(), 5);
+        assert_eq!(MCP_FILES.iter().map(|(file, _)| read(&env, file)).collect::<Vec<_>>(), before);
+        fs::write(env.library.join(manifest::FILE), "").unwrap();
+        assert_eq!(run(&env, false).iter().map(|applied| applied.left).sum::<usize>(), 5);
+        for (file, format) in MCP_FILES {
+            let entries = mcp_entries(&env, file, format);
+            assert_eq!(entries.len(), 1);
+            assert_eq!(entries["local"]["command"], "by-hand");
+        }
+    }
+
+    #[test]
+    fn mcp_rejects_unknown_servers_and_invalid_definitions_before_writing() {
+        let env = mcp_fixture("mcp-invalid");
+        fs::write(env.library.join(manifest::FILE), "[global]\nmcp = [\"missing\"]\n").unwrap();
+        assert!(plan_all(&env).unwrap_err().to_string().contains("MCP server missing"));
+        fs::write(env.library.join(manifest::FILE), "[global]\nmcp = [\"local\"]\n").unwrap();
+        for text in [
+            "command = \"npx\"\nurl = \"https://example.com/mcp\"\n",
+            "env = [\"TOKEN\"]\n",
+            "command = \"npx\"\nenv = [\"TOKEN=secret\"]\n",
+            "command = \"npx\"\nenv = { TOKEN = \"secret\" }\n",
+            "url = \"https://example.com/mcp\"\nbearer_token_env = \"Bearer secret\"\n",
+            "url = \"https://example.com/mcp\"\nbearer_token = \"secret\"\n",
+        ] {
+            fs::write(env.library.join("mcp/local.toml"), text).unwrap();
+            assert!(plan_all(&env).is_err(), "accepted {text}");
+        }
+        assert!(!env.home.join(".claude.json").exists());
+        assert!(!env.home.join(CODEX_CONFIG).exists());
+    }
+
+    #[test]
+    fn mcp_leaves_json_comments_and_backs_up_each_changed_file_once() {
+        let env = mcp_fixture("mcp-comments");
+        let comments = "{ // kept\n\"mcpServers\": {} }\n";
+        fs::write(env.home.join("app/.mcp.json"), comments).unwrap();
+        fs::create_dir_all(env.home.join("app/.agents")).unwrap();
+        fs::write(env.home.join("app/.agents/mcp.json"), comments).unwrap();
+        let originals = [
+            (".claude.json", "{\"mcpServers\":{},\"other\":true}\n"),
+            (CODEX_CONFIG, "# keep\nmodel = 'test'\n"),
+            ("app/.codex/config.toml", "# keep project\nmodel = 'test'\n"),
+        ];
+        for (file, text) in originals {
+            let path = env.home.join(file);
+            fs::create_dir_all(path.parent().unwrap()).unwrap();
+            fs::write(path, text).unwrap();
+        }
+        let (applied, backup) = apply(&env, &plan_all(&env).unwrap(), false).unwrap();
+        assert_eq!(applied[1].left, 4);
+        assert_eq!(read(&env, "app/.mcp.json"), comments);
+        assert_eq!(read(&env, "app/.agents/mcp.json"), comments);
+        let backup = backup.unwrap();
+        assert_eq!(fs::read_dir(&backup).unwrap().count(), 4);
+        for (file, text) in originals {
+            let name = env.home.join(file).to_string_lossy().trim_start_matches('/').replace('/', "__");
+            assert_eq!(fs::read_to_string(backup.join(name)).unwrap(), text);
+        }
+        let before = backups(&env);
+        assert_eq!(apply(&env, &plan_all(&env).unwrap(), false).unwrap().1, None);
+        assert_eq!(backups(&env), before);
+    }
+
+    #[test]
+    fn mcp_keeps_codex_text_outside_the_owned_table_byte_for_byte() {
+        let env = mcp_fixture("mcp-preserve");
+        let prefix = "# before\nmodel  =  'test' # inline\n\n[other]\nweird = [ 1,  2 ]\n\n[mcp_servers.foreign]\ncommand = 'leave-me'\nargs = [ 'one' ] # kept\n";
+        for file in [CODEX_CONFIG, "app/.codex/config.toml"] {
+            let path = env.home.join(file);
+            fs::create_dir_all(path.parent().unwrap()).unwrap();
+            fs::write(path, prefix).unwrap();
+        }
+        run(&env, false);
+        let suffix = "\n[after]\nvalue = { odd = 'spacing' } # last\n";
+        for file in [CODEX_CONFIG, "app/.codex/config.toml"] {
+            let text = read(&env, file);
+            assert!(text.starts_with(prefix), "{text}");
+            fs::write(env.home.join(file), format!("{text}{suffix}")).unwrap();
+        }
+        fs::write(env.library.join("mcp/local.toml"), "command = \"updated\"\n").unwrap();
+        run(&env, false);
+        for file in [CODEX_CONFIG, "app/.codex/config.toml"] {
+            let text = read(&env, file);
+            assert!(text.starts_with(prefix) && text.ends_with(suffix), "{text}");
+        }
+        fs::write(env.library.join(manifest::FILE), "").unwrap();
+        run(&env, false);
+        for file in [CODEX_CONFIG, "app/.codex/config.toml"] {
+            assert_eq!(read(&env, file), format!("{prefix}{suffix}"));
+        }
+    }
+
+    #[test]
+    fn mcp_skips_opencode_and_only_installs_for_the_scopes_harnesses() {
+        let env = mcp_fixture("mcp-harnesses");
+        fs::write(env.library.join(manifest::FILE), "[project.\"~/app\"]\nmcp = [\"local\"]\nharnesses = [\"opencode\"]\n").unwrap();
+        assert!(in_sync(&env));
+        fs::write(env.library.join(manifest::FILE), "[project.\"~/app\"]\nmcp = [\"remote\"]\nharnesses = [\"codex\"]\n").unwrap();
+        run(&env, false);
+        assert!(!env.home.join("app/.mcp.json").exists());
+        assert_eq!(mcp_entries(&env, "app/.agents/mcp.json", McpFormat::Json).len(), 1);
+        assert_eq!(mcp_entries(&env, "app/.codex/config.toml", McpFormat::Codex).len(), 1);
+        fs::write(env.library.join(manifest::FILE), "[project.\"~/app\"]\nmcp = [\"local\"]\nharnesses = [\"claude\"]\n").unwrap();
+        run(&env, false);
+        assert_eq!(mcp_entries(&env, "app/.mcp.json", McpFormat::Json).len(), 1);
+        assert!(mcp_entries(&env, "app/.codex/config.toml", McpFormat::Codex).is_empty());
+        assert!(in_sync(&env));
     }
 }

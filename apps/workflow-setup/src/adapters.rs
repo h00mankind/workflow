@@ -4,8 +4,11 @@
 //! its skills the prefix `<plugin>:`. Codex installs a plugin from this
 //! library as a marketplace, and a config file enables it for a scope.
 //! opencode has no plugins, so it gets one link per skill, with no prefix.
+//! The MCP adapter holds the server config formats and Claude user commands.
 
 use anyhow::{Result, bail};
+
+pub mod mcp;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub enum Harness {

@@ -10,6 +10,7 @@ mod cli;
 mod config;
 mod library;
 mod manifest;
+mod mcp;
 mod ops;
 mod plugins;
 mod scan;

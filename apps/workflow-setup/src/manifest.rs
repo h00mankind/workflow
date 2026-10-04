@@ -1,4 +1,4 @@
-//! `manifest.toml`: which plugins go to global scope and to each project.
+//! `manifest.toml`: which plugins and MCP servers go to each scope.
 
 use std::{
     collections::BTreeMap,
@@ -19,7 +19,7 @@ pub struct Manifest {
     pub scopes: Vec<Scope>,
 }
 
-/// One place that receives plugins: the home folder, or one project.
+/// One place that receives plugins and servers: the home folder, or one project.
 #[derive(Clone, Debug)]
 pub struct Scope {
     /// `global`, or the project path as the manifest gives it.
@@ -29,6 +29,8 @@ pub struct Scope {
     pub harnesses: Vec<Harness>,
     /// Plugins for every harness of the scope.
     pub plugins: Vec<String>,
+    /// Servers for every harness of the scope that supports MCP.
+    pub mcp: Vec<String>,
     /// More plugins, for one harness only.
     pub only: BTreeMap<Harness, Vec<String>>,
 }
@@ -44,6 +46,7 @@ impl Scope {
             global,
             harnesses: Vec::new(),
             plugins: Vec::new(),
+            mcp: Vec::new(),
             only: BTreeMap::new(),
         }
     }
@@ -115,7 +118,7 @@ fn scope(label: &str, root: PathBuf, global: bool, table: &Table) -> Result<Scop
             only.insert(harness, extra);
         }
     }
-    let scope = Scope { label: label.to_string(), root, global, harnesses, plugins: list("plugins")?, only };
+    let scope = Scope { label: label.to_string(), root, global, harnesses, plugins: list("plugins")?, mcp: list("mcp")?, only };
     for harness in &scope.harnesses {
         if global && !harness.installs_globally() {
             bail!("{label}: workflow-setup does not install for {} at global scope", harness.key());

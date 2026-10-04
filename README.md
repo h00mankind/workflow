@@ -47,6 +47,8 @@ A source is one of two kinds. With `plugin = true`, its `path` is a complete plu
 
 `manifest.toml` assigns plugins to `[global]` and to each `[project."<path>"]`, for every harness of the scope or for one harness only.
 
+A scope can also set `mcp = ["<name>", ...]`. Each name is a definition in `mcp/<name>.toml`. Claude Code and Codex receive those servers when the scope names that harness. opencode skips them. An unknown plugin or server name is an error.
+
 ```bash
 workflow-setup status                 # the drift between manifest.toml and the disk, for every scope
 workflow-setup apply --dry-run        # the same, and change nothing
@@ -59,6 +61,14 @@ Each harness receives a plugin in its own way:
 - **Claude Code** loads a plugin from a link in `.claude/skills/`. It reads the library in place, so an edit or an accepted update is live in the next session.
 - **Codex** installs from this library as the marketplace `workflow`, and keeps its own copy. `apply` copies a plugin again when its content changed, and sets `[plugins."<name>@workflow"]` in `~/.codex/config.toml` and in each project's `.codex/config.toml`. A plugin is off at global scope unless `[global]` assigns it.
 - **opencode** has no plugins. It gets one link per skill in `.opencode/skill/`, with no prefix. Where two plugins share a name, `h00man` wins, then the order in `sources.toml`.
+
+MCP servers go to each harness's config:
+
+- **Claude Code** reads project servers from `.mcp.json`, under `mcpServers`. For global servers, `apply` runs `claude mcp add-json --scope user` and `claude mcp remove --scope user`. It reads `~/.claude.json` to check drift but never edits that file by hand.
+- **Codex** reads `[mcp_servers.<name>]` in `.codex/config.toml`, or `~/.codex/config.toml` at global scope. The engine keeps the rest of the TOML file as it is.
+- Each project also gets `.agents/mcp.json`, with the same format as `.mcp.json`, when it uses Claude Code or Codex. There is no global neutral file.
+
+The record owns each MCP entry by its file, server name, and value hash. A foreign entry with the same name, or an owned entry edited outside the engine, is a conflict and stays untouched. `--adopt` does not replace it. Dropping an assignment removes only matching owned entries. JSON files with comments stay untouched and report a conflict.
 
 `apply` owns a link when its record has it, or when the link points into this library. In a Codex config file it owns the entries of the `workflow` marketplace. It never changes or removes an item it does not own: a link that something else made is a conflict until `--adopt`, and a real file or folder is never replaced. Before it changes a link or a config file, it writes the old state to a backup. The record and the backups are in `~/Library/Application Support/workflow-setup/`. A second `apply` changes nothing.
 
