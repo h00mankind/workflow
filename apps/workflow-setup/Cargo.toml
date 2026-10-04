@@ -1,0 +1,16 @@
+[package]
+name = "workflow-setup"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.95"
+publish = false
+
+[dependencies]
+ely-gpui-component = { git = "https://github.com/ZacharyZhang-NY/Ely-GPUI-Components", rev = "beea6caa04b75bcaf6b5a2b1a42213d5f5101097" }
+# Must be the same rev that ely-gpui-component pins.
+gpui = { git = "https://github.com/zed-industries/zed", rev = "1a28cff4b409169bac058bca40dfbfeb7621d19b", default-features = false, features = ["stacker"] }
+gpui_platform = { git = "https://github.com/zed-industries/zed", rev = "1a28cff4b409169bac058bca40dfbfeb7621d19b", features = ["font-kit"] }
+anyhow = "1"
+serde = { version = "1", features = ["derive"] }
+serde_json = { version = "1", features = ["preserve_order"] }
+toml_edit = "0.22"

@@ -1,0 +1,22 @@
+# Outside sources. Each table is one git repository whose skills the library
+# keeps as a verbatim copy in skills/<name>/.
+#
+#   repository  where to fetch from
+#   path        the folder in the repository that holds the skills
+#   commit      the pin: the commit the copy came from. `sources accept` moves it.
+#   skills      the skills to copy. Without it, every skill under `path`.
+#   branch      the branch to follow. Without it, the default branch.
+#
+# The order here is the order of precedence when two sources have a skill
+# with the same name. skills/h00man/ always wins.
+
+[matt]
+repository = "https://github.com/mattpocock/skills"
+path = "skills"
+skills = ["teach", "handoff", "writing-for-agents"]
+commit = "24fe0ef7737efae15c87225755e9f6f5965e4888"
+
+[poteto]
+repository = "https://github.com/h00mankind/pstack"
+path = "plugins/pstack/skills"
+commit = "aa42c8310138836c07b7f0b6945225ffa4a81c87"
