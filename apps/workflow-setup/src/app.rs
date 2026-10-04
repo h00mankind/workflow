@@ -1,13 +1,16 @@
 //! The window: tabs, a list of items, and the selected item with its editor.
 
-use std::path::{Path, PathBuf};
+use std::{
+    collections::BTreeSet,
+    path::{Path, PathBuf},
+};
 
 use ely_gpui_component::{
     buttons::{Button, ButtonVariant},
     data_display::{Badge, DescriptionList, Tone},
     editor::{CodeEditor, EditorEvent},
     feedback::{Callout, EmptyState, Toast, ToastViewport, Toaster},
-    forms::{Choice, Input, InputEvent, SearchInput, TextInput},
+    forms::{Choice, Input, InputEvent, SearchInput, Switch, TextInput},
     layout::ScrollArea,
     lists::{ListItem, SelectableList},
     menus::{DropdownMenu, Menu, MenuItem},
@@ -18,6 +21,7 @@ use ely_gpui_component::{
     theme::{ActiveTheme, ControlSize},
     typography::{Caption, Heading, Overline, Paragraph},
 };
+use anyhow::Context as _;
 use gpui::{
     AnyElement, App, AppContext, ClickEvent, Context, Entity, FocusHandle, InteractiveElement,
     IntoElement, ParentElement, PathPromptOptions, Render, SharedString, Styled, Subscription,
@@ -25,8 +29,9 @@ use gpui::{
 };
 
 use crate::{
+    apply::{self, Env, Plan},
     config::Config,
-    library,
+    library, manifest,
     ops::{self, Removed},
     scan::{self, Agent, Instruction, MCP_TARGETS, McpServer, Project, SKILL_DIRS, SKILL_TARGETS, Skill, Status},
 };
@@ -43,10 +48,12 @@ enum Tab {
     Mcp,
     Agents,
     Instructions,
+    /// The drift between the manifest and the disk, for every scope.
+    Drift,
 }
 
 impl Tab {
-    const ALL: [Tab; 4] = [Tab::Skills, Tab::Mcp, Tab::Agents, Tab::Instructions];
+    const ALL: [Tab; 5] = [Tab::Skills, Tab::Mcp, Tab::Agents, Tab::Instructions, Tab::Drift];
 
     fn key(self) -> &'static str {
         match self {
@@ -54,6 +61,7 @@ impl Tab {
             Tab::Mcp => "mcp",
             Tab::Agents => "agents",
             Tab::Instructions => "instructions",
+            Tab::Drift => "drift",
         }
     }
 
@@ -63,6 +71,7 @@ impl Tab {
             Tab::Mcp => "MCP servers",
             Tab::Agents => "Agents",
             Tab::Instructions => "Instructions",
+            Tab::Drift => "Drift",
         }
     }
 
@@ -94,6 +103,8 @@ enum Prompt {
     Discard(Intent),
     Remove(Removal),
     NewServer,
+    /// Make the disk match the manifest in the scope at this root.
+    Apply { root: PathBuf, adopt: bool },
 }
 
 /// The file the editor holds, and its text as last read or saved.
@@ -116,7 +127,11 @@ pub struct Manager {
     project: Option<Project>,
     tab: Tab,
     /// The chosen item of each tab, by `Tab::ALL` order.
-    selected: [Option<String>; 4],
+    selected: [Option<String>; 5],
+    /// The drift of every scope, or why the engine cannot give it.
+    plans: Result<Vec<Plan>, String>,
+    /// The items (`<origin>/<name>`) the manifest assigns to the open project.
+    assigned: BTreeSet<String>,
     filter: Entity<TextInput>,
     editor: Entity<CodeEditor>,
     editing: Option<Editing>,
@@ -156,6 +171,8 @@ impl Manager {
             project: None,
             tab: Tab::Skills,
             selected: Default::default(),
+            plans: Ok(Vec::new()),
+            assigned: BTreeSet::new(),
             filter,
             editor,
             editing: None,
@@ -179,12 +196,15 @@ impl Manager {
         if self.config.library.is_none() && library::is_library(&root) {
             self.config.library = Some(root.clone());
         }
-        self.config.opened(root.clone());
+        if root != scan::home() {
+            self.config.opened(root.clone());
+        }
         self.save_config(cx);
         let project = scan::scan(&root, self.config.library.as_deref());
         window.set_window_title(&format!("{} — workflow-setup", project.name));
         self.selected = Default::default();
         self.project = Some(project);
+        self.read_engine();
         self.settle(cx);
     }
 
@@ -192,7 +212,53 @@ impl Manager {
         if let Some(root) = self.project.as_ref().map(|project| project.root.clone()) {
             self.project = Some(scan::scan(&root, self.config.library.as_deref()));
         }
+        self.read_engine();
         self.settle(cx);
+    }
+
+    fn env(&self) -> Option<Env> {
+        self.config.library.clone().map(Env::new)
+    }
+
+    /// Reads the manifest's view: the drift, and what the open project is assigned.
+    fn read_engine(&mut self) {
+        let Some(env) = self.env() else {
+            self.plans = Err("Choose a library to see the drift.".to_string());
+            self.assigned.clear();
+            return;
+        };
+        self.plans = apply::plan_all(&env).map_err(|error| format!("{error:#}"));
+        self.assigned = match &self.project {
+            Some(project) => apply::assigned(&env, &project.root).unwrap_or_default(),
+            None => BTreeSet::new(),
+        };
+    }
+
+    fn plan(&self) -> Option<&Plan> {
+        let key = self.chosen(Tab::Drift)?;
+        self.plans.as_ref().ok()?.iter().find(|plan| plan.scope.root.to_string_lossy() == key)
+    }
+
+    /// Assigns a library skill to the open project in the manifest, or takes
+    /// it out, then makes that project match.
+    fn assign(&mut self, item: String, on: bool, cx: &mut Context<Self>) {
+        let (Some(env), Some(root)) = (self.env(), self.project.as_ref().map(|project| project.root.clone())) else { return };
+        let result = manifest::assign(&env.library, &env.home, &root, &item, on)
+            .and_then(|()| self.apply_scope(&env, &root, false))
+            .map(|done| format!("{} {item}. {done}", if on { "Assigned" } else { "Took out" }));
+        self.finish(result, cx);
+    }
+
+    fn apply_scope(&self, env: &Env, root: &Path, adopt: bool) -> anyhow::Result<String> {
+        let mut plans = apply::plan_all(env)?;
+        plans.retain(|plan| plan.scope.root == root);
+        let (results, _) = apply::apply(env, &plans, adopt)?;
+        let (written, removed, left) = results.iter().fold((0, 0, 0), |sum, applied| (sum.0 + applied.written, sum.1 + applied.removed, sum.2 + applied.left));
+        let mut done = format!("{written} written, {removed} removed");
+        if left > 0 {
+            done.push_str(&format!(", {left} left because workflow-setup does not own them"));
+        }
+        Ok(done)
     }
 
     /// After the project or the selection changed: a tab whose item is gone
@@ -250,7 +316,7 @@ impl Manager {
     fn document(&self) -> Option<(PathBuf, String)> {
         match self.tab {
             Tab::Skills => self.skill().and_then(|skill| Some((skill.file.clone()?, skill.content.clone()))),
-            Tab::Mcp => None,
+            Tab::Mcp | Tab::Drift => None,
             Tab::Agents => self.agent().map(|agent| (agent.file.clone(), agent.content.clone())),
             Tab::Instructions => self.instruction().map(|file| (file.abs.clone(), file.content.clone())),
         }
@@ -265,6 +331,18 @@ impl Manager {
     fn rows(&self, tab: Tab) -> Vec<Row> {
         let Some(project) = &self.project else { return Vec::new() };
         match tab {
+            Tab::Drift => self
+                .plans
+                .iter()
+                .flatten()
+                .map(|plan| Row {
+                    key: plan.scope.root.to_string_lossy().into_owned(),
+                    title: if plan.scope.global { "Global".to_string() } else { apply::tilde(&scan::home(), &plan.scope.root) },
+                    description: if plan.in_sync() { "In sync with the manifest".to_string() } else { format!("{} to change", plan.changes.len()) },
+                    detail: plan.scope.harnesses.iter().map(|harness| harness.key()).collect::<Vec<_>>().join(" · "),
+                    warning: (!plan.in_sync()).then_some("drift"),
+                })
+                .collect(),
             Tab::Skills => project
                 .skills
                 .iter()
@@ -530,6 +608,12 @@ impl Manager {
                 row.child(DropdownMenu::new("recent", "Recent", recent).icon(IconName::History))
             })
             .child(
+                Button::new("global", "Global")
+                    .icon(IconName::Library)
+                    .disabled(self.project.as_ref().is_some_and(|project| project.global))
+                    .on_click(cx.listener(|this, _: &ClickEvent, window, cx| this.request(Intent::Open(scan::home()), window, cx))),
+            )
+            .child(
                 Button::new("library", "Library…")
                     .icon(IconName::Library)
                     .on_click(cx.listener(|this, _: &ClickEvent, window, cx| this.pick_folder(true, window, cx))),
@@ -632,6 +716,7 @@ impl Manager {
             Tab::Mcp => "No config file in the project sets an MCP server. Add one below.",
             Tab::Agents => "The project has no agents, and the library has none to install.",
             Tab::Instructions => "The project has no CLAUDE.md or AGENTS.md. Create one below.",
+            Tab::Drift => return self.plans.as_ref().err().cloned().unwrap_or_else(|| "manifest.toml has no scope.".to_string()),
         }
         .to_string()
     }
@@ -657,7 +742,7 @@ impl Manager {
                         .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| this.create_instruction(name, cx)))
                 })
                 .collect(),
-            Tab::Skills | Tab::Agents => Vec::new(),
+            Tab::Skills | Tab::Agents | Tab::Drift => Vec::new(),
         };
         if buttons.is_empty() {
             return None;
@@ -682,6 +767,7 @@ impl Manager {
             Tab::Mcp => self.server().map(|server| self.server_summary(server, cx)),
             Tab::Agents => self.agent().map(|agent| self.agent_summary(agent, cx)),
             Tab::Instructions => self.instruction().map(|file| self.instruction_summary(file)),
+            Tab::Drift => self.plan().map(|plan| self.drift_summary(plan, cx)),
         };
         let Some(summary) = summary else {
             return div()
@@ -796,7 +882,16 @@ impl Manager {
         }
         facts = facts.item("Files", skill.files.join("  "));
 
+        let toggle = (!skill.origin.is_empty()).then(|| {
+            let item = format!("{}/{}", skill.origin, skill.name);
+            let this = cx.entity();
+            Switch::new("assigned", self.assigned.contains(&item))
+                .label(format!("Assigned to {} in manifest.toml, as {item}", if project.global { "global scope" } else { "this project" }))
+                .on_change(move |on, _, cx| this.update(cx, |this, cx| this.assign(item.clone(), on, cx)))
+        });
+
         summary(&skill.name, &skill.description)
+            .children(toggle)
             .when(skill.differs, |summary| {
                 summary.child(Callout::new(Severity::Warning).title("Copies differ").child(
                     "The SKILL.md files are not the same in all locations. The editor has the first one.",
@@ -943,6 +1038,49 @@ impl Manager {
         summary(&file.rel, "").child(facts).into_any_element()
     }
 
+    fn drift_summary(&self, plan: &Plan, cx: &mut Context<Self>) -> AnyElement {
+        let home = scan::home();
+        let title = if plan.scope.global { "Global".to_string() } else { apply::tilde(&home, &plan.scope.root) };
+        let state = if plan.in_sync() {
+            "The disk matches manifest.toml.".to_string()
+        } else {
+            format!("{} items on the disk do not match manifest.toml.", plan.changes.len())
+        };
+        let button = |id: &'static str, label: &'static str, adopt: bool| {
+            let root = plan.scope.root.clone();
+            Button::new(id, label)
+                .size(ControlSize::Sm)
+                .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
+                    this.prompt = Some(Prompt::Apply { root: root.clone(), adopt });
+                    cx.notify();
+                }))
+        };
+        let mut actions = div().flex().gap_2().child(button("apply", "Apply", false).primary().disabled(plan.in_sync()));
+        if plan.can_adopt() {
+            actions = actions.child(button("adopt", "Apply and adopt", true));
+        }
+        let mut pane = summary(&title, &state).child(actions);
+        for collision in &plan.collisions {
+            pane = pane.child(Callout::new(Severity::Info).title(format!("{} has two origins", collision.name)).child(format!(
+                "{} and {} supply it. {} wins.",
+                collision.winner,
+                collision.losers.join(", "),
+                collision.winner
+            )));
+        }
+        for (label, names) in plan.groups(&home) {
+            pane = pane.child(
+                div()
+                    .flex()
+                    .flex_col()
+                    .gap_1()
+                    .child(Overline::new(format!("{label} · {}", names.len())))
+                    .child(Paragraph::new(names.join("  "))),
+            );
+        }
+        pane.into_any_element()
+    }
+
     fn dialog(&self, cx: &mut Context<Self>) -> Option<AnyElement> {
         let this = cx.entity();
         let close = {
@@ -986,6 +1124,23 @@ impl Manager {
                     .destructive()
                     .on_confirm(move |_, cx| {
                         this.update(cx, |this, cx| this.remove(removal.clone(), cx));
+                    })
+                    .into_any_element()
+            }
+            Prompt::Apply { root, adopt } => {
+                let (root, adopt) = (root.clone(), *adopt);
+                let message = if adopt {
+                    "This writes the links that manifest.toml assigns, and replaces the links that something else made. A backup keeps the old link targets."
+                } else {
+                    "This writes the links that manifest.toml assigns. It leaves each item that workflow-setup does not own. A backup keeps the old link targets."
+                };
+                ConfirmDialog::new("apply", format!("Apply to {}?", apply::tilde(&scan::home(), &root)), message, close)
+                    .confirm("Apply")
+                    .on_confirm(move |_, cx| {
+                        this.update(cx, |this, cx| {
+                            let result = this.env().context("No library").and_then(|env| this.apply_scope(&env, &root, adopt));
+                            this.finish(result.map(|done| format!("Applied. {done}")), cx);
+                        });
                     })
                     .into_any_element()
             }

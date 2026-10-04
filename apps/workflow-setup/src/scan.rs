@@ -114,6 +114,8 @@ pub struct Skill {
     pub installs: Vec<Install>,
     /// This skill's folder in the library.
     pub library: Option<PathBuf>,
+    /// The library origin that supplies it, such as `h00man`.
+    pub origin: String,
     pub differs: bool,
     /// Where `skills-lock.json` says it came from.
     pub source: String,
@@ -191,6 +193,8 @@ pub struct Instruction {
 pub struct Project {
     pub root: PathBuf,
     pub name: String,
+    /// The home folder: what every project gets.
+    pub global: bool,
     pub skills: Vec<Skill>,
     pub mcp: Vec<McpServer>,
     pub agents: Vec<Agent>,
@@ -198,13 +202,15 @@ pub struct Project {
 }
 
 pub fn scan(root: &Path, library: Option<&Path>) -> Project {
+    let global = root == home();
     Project {
         root: root.to_path_buf(),
-        name: file_name(root),
+        name: if global { "Global".to_string() } else { file_name(root) },
+        global,
         skills: scan_skills(root, library),
         mcp: scan_mcp(root),
         agents: scan_agents(root, library),
-        instructions: scan_instructions(root),
+        instructions: if global { global_instructions(root) } else { scan_instructions(root) },
     }
 }
 
@@ -472,6 +478,7 @@ fn skill_entry(by_name: &mut BTreeMap<String, Skill>, name: String) -> &mut Skil
         files: Vec::new(),
         installs: Vec::new(),
         library: None,
+        origin: String::new(),
         differs: false,
         source: String::new(),
     })
@@ -522,6 +529,7 @@ fn scan_skills(root: &Path, library: Option<&Path>) -> Vec<Skill> {
             let Ok(text) = fs::read_to_string(item.dir.join("SKILL.md")) else { continue };
             let skill = skill_entry(&mut by_name, item.name);
             skill.library = Some(item.dir.clone());
+            skill.origin = item.origin;
             fill_skill(skill, &item.dir, text);
         }
     }
@@ -824,6 +832,14 @@ fn walk_instructions(root: &Path, dir: &Path, depth: usize, out: &mut Vec<Instru
             walk_instructions(root, &path, depth + 1, out);
         }
     }
+}
+
+/// The instruction files each harness reads for every project.
+fn global_instructions(home: &Path) -> Vec<Instruction> {
+    [(".claude/CLAUDE.md", "Claude Code"), (".codex/AGENTS.md", "Codex"), ("AGENTS.md", "Codex + others")]
+        .into_iter()
+        .filter_map(|(file, tool)| read_instruction(home, &home.join(file), tool, "global"))
+        .collect()
 }
 
 fn scan_instructions(root: &Path) -> Vec<Instruction> {

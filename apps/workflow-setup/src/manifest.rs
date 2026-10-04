@@ -35,6 +35,10 @@ pub struct Scope {
     pub bundles: Vec<String>,
     /// More bundles, for one harness only.
     pub only: BTreeMap<Harness, Vec<String>>,
+    /// Single items added to the bundles, for every harness.
+    pub items: Vec<String>,
+    /// Single items taken out of the bundles, for every harness.
+    pub without: Vec<String>,
 }
 
 impl Scope {
@@ -49,6 +53,8 @@ impl Scope {
             harnesses: Vec::new(),
             bundles: Vec::new(),
             only: BTreeMap::new(),
+            items: Vec::new(),
+            without: Vec::new(),
         }
     }
 }
@@ -111,7 +117,16 @@ fn scope(label: &str, root: PathBuf, global: bool, table: &Table, bundles: &BTre
             only.insert(harness, extra);
         }
     }
-    let scope = Scope { label: label.to_string(), root, global, harnesses, bundles: list("bundles")?, only };
+    let scope = Scope {
+        label: label.to_string(),
+        root,
+        global,
+        harnesses,
+        bundles: list("bundles")?,
+        only,
+        items: list("items")?,
+        without: list("without")?,
+    };
     for harness in &scope.harnesses {
         if harness.skill_dir(global).is_none() {
             bail!("{label}: workflow-setup does not install skills for {} at this scope", harness.key());
@@ -144,6 +159,7 @@ impl Manifest {
             .iter()
             .chain(extra)
             .flat_map(|bundle| self.bundles.get(bundle).into_iter().flatten())
+            .chain(&scope.items)
             .collect();
         for pattern in &patterns {
             let Some((origin, name)) = pattern.split_once('/') else {
@@ -155,8 +171,108 @@ impl Manifest {
         }
         Ok(library
             .iter()
-            .filter(|item| patterns.iter().any(|pattern| **pattern == format!("{}/*", item.origin) || **pattern == format!("{}/{}", item.origin, item.name)))
+            .filter(|item| patterns.iter().any(|pattern| matches(pattern, item)))
+            .filter(|item| !scope.without.iter().any(|pattern| matches(pattern, item)))
             .cloned()
             .collect())
+    }
+}
+
+fn matches(pattern: &str, item: &Item) -> bool {
+    pattern == format!("{}/*", item.origin) || pattern == format!("{}/{}", item.origin, item.name)
+}
+
+/// Assigns `item` (`<origin>/<name>`) to the scope at `root`, or takes it
+/// out, for every harness of the scope. Writes `manifest.toml` and keeps its
+/// comments. A project that the manifest does not have gets a table.
+pub fn assign(library: &Path, home: &Path, root: &Path, item: &str, on: bool) -> Result<()> {
+    let path = library.join(FILE);
+    let text = fs::read_to_string(&path).unwrap_or_default();
+    let manifest = parse(&text, home)?;
+    let mut document: DocumentMut = text.parse().with_context(|| format!("{FILE} is not valid TOML"))?;
+
+    let known = manifest.scopes.iter().find(|scope| scope.root == root);
+    let covered = known.is_some_and(|scope| {
+        let bundles = scope.bundles.iter().chain(scope.only.values().flatten());
+        let (origin, _) = item.split_once('/').unwrap_or_default();
+        bundles
+            .flat_map(|bundle| manifest.bundles.get(bundle).into_iter().flatten())
+            .any(|pattern| pattern == item || *pattern == format!("{origin}/*"))
+    });
+    let table = if root == home {
+        document.entry(GLOBAL).or_insert(toml_edit::table())
+    } else {
+        let label = match known {
+            Some(scope) => scope.label.clone(),
+            None => match root.strip_prefix(home) {
+                Ok(rest) => format!("~/{}", rest.display()),
+                Err(_) => root.display().to_string(),
+            },
+        };
+        let projects = document.entry("project").or_insert(toml_edit::table());
+        if let Some(projects) = projects.as_table_mut() {
+            projects.set_implicit(true);
+        }
+        projects.as_table_mut().context("`project` is not a table")?.entry(&label).or_insert(toml_edit::table())
+    };
+    let table = table.as_table_mut().context("the scope is not a table")?;
+
+    // `items` adds to the bundles and `without` takes out of them.
+    let (add_to, drop_from, needed) = if on { ("items", "without", !covered) } else { ("without", "items", covered) };
+    if let Some(list) = table.get_mut(drop_from).and_then(Toml::as_array_mut) {
+        list.retain(|value| value.as_str() != Some(item));
+        if list.is_empty() {
+            table.remove(drop_from);
+        }
+    }
+    if needed {
+        let list = table.entry(add_to).or_insert(toml_edit::value(toml_edit::Array::new()));
+        let list = list.as_array_mut().with_context(|| format!("`{add_to}` is not a list"))?;
+        if !list.iter().any(|value| value.as_str() == Some(item)) {
+            list.push(item);
+        }
+    }
+    fs::write(&path, document.to_string()).with_context(|| format!("cannot write {}", path.display()))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn item(origin: &str, name: &str) -> Item {
+        Item { name: name.into(), origin: origin.into(), dir: PathBuf::new() }
+    }
+
+    #[test]
+    fn a_toggle_adds_to_the_bundles_or_takes_out_of_them() {
+        let root = std::env::temp_dir().join(format!("workflow-setup-manifest-{}", std::process::id()));
+        fs::remove_dir_all(&root).ok();
+        let (library, home) = (root.join("library"), root.join("home"));
+        fs::create_dir_all(&library).unwrap();
+        fs::write(library.join(FILE), "# kept\n[bundles]\ncore = [\"h00man/*\"]\n\n[global]\nbundles = [\"core\"]\n").unwrap();
+        let skills = [item("h00man", "plan"), item("h00man", "ship"), item("matt", "teach")];
+        let names = |root: &Path| -> Vec<String> {
+            let manifest = load(&library, &home).unwrap();
+            let Some(scope) = manifest.scopes.iter().find(|scope| scope.root == root) else { return Vec::new() };
+            manifest.items(scope, Harness::Claude, &skills).unwrap().into_iter().map(|item| item.name).collect()
+        };
+
+        // Out of a bundle, then in again: the file returns to what it was.
+        let before = fs::read_to_string(library.join(FILE)).unwrap();
+        assign(&library, &home, &home, "h00man/ship", false).unwrap();
+        assert_eq!(names(&home), ["plan"]);
+        assign(&library, &home, &home, "h00man/ship", true).unwrap();
+        assert_eq!(names(&home), ["plan", "ship"]);
+        assert_eq!(fs::read_to_string(library.join(FILE)).unwrap(), before);
+
+        // An item that no bundle has, in a project that the manifest does not have.
+        let app = home.join("app");
+        assign(&library, &home, &app, "matt/teach", true).unwrap();
+        assign(&library, &home, &app, "matt/teach", true).unwrap();
+        assert_eq!(names(&app), ["teach"]);
+        assert!(fs::read_to_string(library.join(FILE)).unwrap().contains("[project.\"~/app\"]\nitems = [\"matt/teach\"]"));
+        assign(&library, &home, &app, "matt/teach", false).unwrap();
+        assert_eq!(names(&app), Vec::<String>::new());
+        assert_eq!(names(&home), ["plan", "ship"]);
     }
 }

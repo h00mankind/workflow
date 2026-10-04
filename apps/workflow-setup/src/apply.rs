@@ -6,7 +6,7 @@
 //! the record has it, or when it is a link into the library.
 
 use std::{
-    collections::BTreeMap,
+    collections::{BTreeMap, BTreeSet},
     fs,
     path::{Path, PathBuf},
     time::{SystemTime, UNIX_EPOCH},
@@ -76,6 +76,60 @@ impl Plan {
     pub fn in_sync(&self) -> bool {
         self.changes.is_empty()
     }
+
+    /// True when a link that something else made is in the way.
+    pub fn can_adopt(&self) -> bool {
+        self.changes.iter().any(|change| matches!(change, Change::Conflict { foreign_link: Some(_), .. }))
+    }
+
+    /// The changes for display: one group per kind of change and folder,
+    /// with the names it holds.
+    pub fn groups(&self, home: &Path) -> Vec<(String, Vec<String>)> {
+        let mut groups: Vec<(String, Vec<String>)> = Vec::new();
+        for change in &self.changes {
+            let dir = change.path().parent().unwrap_or(&self.scope.root);
+            let dir = dir.strip_prefix(&self.scope.root).unwrap_or(dir).display();
+            let from = |from: &Path| tilde(home, from.parent().unwrap_or(from));
+            let label = match change {
+                Change::Link { .. } => format!("link     {dir}"),
+                Change::Relink { from: was, .. } => format!("relink   {dir}  (now links into {})", from(was)),
+                Change::Remove { from: was, .. } => format!("remove   {dir}  (links into {}, not assigned)", from(was)),
+                Change::Conflict { foreign_link: Some(was), .. } => {
+                    format!("conflict {dir}  (a link into {}, not made by workflow-setup; adopt replaces it)", from(was))
+                }
+                Change::Conflict { foreign_link: None, .. } => format!("conflict {dir}  (a real file or folder; move it away by hand)"),
+            };
+            let name = change.path().file_name().unwrap_or_default().to_string_lossy().into_owned();
+            match groups.iter_mut().find(|(group, _)| *group == label) {
+                Some((_, names)) => names.push(name),
+                None => groups.push((label, vec![name])),
+            }
+        }
+        groups
+    }
+}
+
+/// A path as the user reads it: from `~` when it is in the home folder.
+pub fn tilde(home: &Path, path: &Path) -> String {
+    match path.strip_prefix(home) {
+        Ok(rest) if rest.as_os_str().is_empty() => "~".to_string(),
+        Ok(rest) => format!("~/{}", rest.display()),
+        Err(_) => path.display().to_string(),
+    }
+}
+
+/// The items (`<origin>/<name>`) that the manifest assigns to the scope at
+/// `root`, for one harness or more.
+pub fn assigned(env: &Env, root: &Path) -> Result<BTreeSet<String>> {
+    let manifest = manifest::load(&env.library, &env.home)?;
+    let skills = library::skills(&env.library);
+    let mut items = BTreeSet::new();
+    for scope in manifest.scopes.iter().filter(|scope| scope.root == root) {
+        for &harness in &scope.harnesses {
+            items.extend(manifest.items(scope, harness, &skills)?.into_iter().map(|item| format!("{}/{}", item.origin, item.name)));
+        }
+    }
+    Ok(items)
 }
 
 /// Scope root to the links installed there, each with its target.

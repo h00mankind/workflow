@@ -5,7 +5,7 @@ use std::path::{Path, PathBuf};
 use anyhow::{Context as _, Result, bail};
 
 use crate::{
-    apply::{self, Change, Env, Plan},
+    apply::{self, Env, Plan},
     config::Config,
     library, manifest, sources,
 };
@@ -130,38 +130,13 @@ fn print_plan(env: &Env, plan: &Plan) {
         return;
     }
     println!("{title}: {} to change", plan.changes.len());
-    // One line per kind of change and folder.
-    let mut groups: Vec<(String, Vec<String>)> = Vec::new();
-    for change in &plan.changes {
-        let dir = change.path().parent().unwrap_or(&plan.scope.root);
-        let dir = dir.strip_prefix(&plan.scope.root).unwrap_or(dir).display();
-        let from = |from: &Path| tilde(env, from.parent().unwrap_or(from));
-        let label = match change {
-            Change::Link { .. } => format!("link     {dir}"),
-            Change::Relink { from: was, .. } => format!("relink   {dir}  (now links into {})", from(was)),
-            Change::Remove { from: was, .. } => format!("remove   {dir}  (links into {}, not assigned)", from(was)),
-            Change::Conflict { foreign_link: Some(was), .. } => {
-                format!("conflict {dir}  (a link into {}, not made by workflow-setup; --adopt replaces it)", from(was))
-            }
-            Change::Conflict { foreign_link: None, .. } => format!("conflict {dir}  (a real file or folder; move it away by hand)"),
-        };
-        let name = change.path().file_name().unwrap_or_default().to_string_lossy().into_owned();
-        match groups.iter_mut().find(|(group, _)| *group == label) {
-            Some((_, names)) => names.push(name),
-            None => groups.push((label, vec![name])),
-        }
-    }
-    for (label, names) in groups {
+    for (label, names) in plan.groups(&env.home) {
         println!("  {label}\n    {} ({})", names.join(" "), names.len());
     }
 }
 
 fn tilde(env: &Env, path: &Path) -> String {
-    match path.strip_prefix(&env.home) {
-        Ok(rest) if rest.as_os_str().is_empty() => "~".to_string(),
-        Ok(rest) => format!("~/{}", rest.display()),
-        Err(_) => path.display().to_string(),
-    }
+    apply::tilde(&env.home, path)
 }
 
 fn list(library: &Path) -> Result<()> {
