@@ -2,9 +2,11 @@
 //! copies at a pinned commit, one plugin folder per source.
 //!
 //! `fetch` gets a source's newest commit into a cache and remembers it.
-//! `diff` shows what that commit would change in `plugins/<source>/`.
-//! `accept` writes the copy and moves the pin. Only `accept` changes the
-//! library, and it accepts the commit that `diff` showed.
+//! `diff` shows what that commit would change in `plugins/<source>/`, and
+//! remembers the commit it showed. `accept` writes the copy of that commit
+//! and moves the pin. Only `accept` changes the library. It swaps the
+//! folder in one rename, and on an error it puts the old copy and the old
+//! pin back.
 
 use std::{
     collections::{BTreeMap, BTreeSet},
@@ -22,6 +24,8 @@ pub const FILE: &str = "sources.toml";
 const CACHE: &str = ".cache/sources";
 /// The commit the last `fetch` found, kept in the cache repository.
 const FETCHED: &str = "refs/workflow/fetched";
+/// The commit the last `diff` showed. `accept` takes this commit.
+const SHOWN: &str = "refs/workflow/shown";
 const LICENSE_FILES: &[&str] = &["LICENSE", "LICENSE.md", "LICENSE.txt"];
 const SYMLINK_MODE: &str = "120000";
 
@@ -53,6 +57,8 @@ pub struct Diff {
     pub edited_here: Vec<String>,
     /// Skills that `sources.toml` names and the source does not have.
     pub missing: Vec<String>,
+    /// Every skill of the copy at `to`.
+    pub skills: Vec<String>,
     /// The source's commits from the pin to the fetched commit.
     pub log: String,
     pub patch: String,
@@ -146,7 +152,10 @@ pub fn diff(library: &Path, source: &Source) -> Result<Diff> {
     let (next, missing) = export(library, source, &to, "next")?;
     let current = plugins::dir(library, &source.name);
 
-    let mut diff = Diff { from: source.commit.clone(), to: to.clone(), missing, ..Default::default() };
+    let skills = fs::read_dir(next.join("skills")).into_iter().flatten().flatten().map(|entry| entry.file_name().to_string_lossy().into_owned());
+    let mut skills: Vec<String> = skills.filter(|name| !name.starts_with('.')).collect();
+    skills.sort();
+    let mut diff = Diff { from: source.commit.clone(), to: to.clone(), missing, skills, ..Default::default() };
     (diff.added, diff.removed, diff.changed) = compare(&current, &next);
 
     if let Some(pin) = source.commit.as_deref().filter(|pin| has_commit(&cache, pin)) {
@@ -176,14 +185,19 @@ pub fn diff(library: &Path, source: &Source) -> Result<Diff> {
         .output()
         .context("cannot run git")?;
     diff.patch = String::from_utf8_lossy(&patch.stdout).into_owned();
+    git(&cache, &["update-ref", SHOWN, &to])?;
     Ok(diff)
 }
 
-/// Replaces `plugins/<source>/` with the copy at the fetched commit and moves
-/// the pin to it. Returns the new pin.
+/// Replaces `plugins/<source>/` with the copy at the commit that the last
+/// `diff` showed, and moves the pin to it. Returns the new pin. On an error
+/// after the swap, the old copy and the old `sources.toml` come back.
 pub fn accept(library: &Path, source: &Source) -> Result<String> {
     let cache = cache_repo(library, source);
-    let to = fetched(&cache, source)?;
+    if !cache.is_dir() {
+        bail!("{} is not fetched. Run `sources fetch {}` first.", source.name, source.name);
+    }
+    let to = git(&cache, &["rev-parse", "--verify", "--quiet", SHOWN]).map_err(|_| anyhow::anyhow!("run `sources diff {}` first. accept takes the commit that diff showed.", source.name))?;
     let (next, missing) = export(library, source, &to, "next")?;
     if !missing.is_empty() {
         bail!("{} does not have: {}. Correct `skills` in {FILE}.", source.name, missing.join(", "));
@@ -191,14 +205,94 @@ pub fn accept(library: &Path, source: &Source) -> Result<String> {
     let current = plugins::dir(library, &source.name);
     let previous = stage_dir(library, source, "previous");
     remove_dir(&previous)?;
-    if current.is_dir() {
+    let pins = fs::read_to_string(library.join(FILE)).with_context(|| format!("cannot read {FILE}"))?;
+    let had_copy = current.is_dir();
+    if had_copy {
         fs::rename(&current, &previous).with_context(|| format!("cannot move {}", current.display()))?;
     }
-    fs::create_dir_all(library.join("plugins"))?;
-    fs::rename(&next, &current).with_context(|| format!("cannot write {}", current.display()))?;
-    set_pin(library, &source.name, &to)?;
-    plugins::sync(library)?;
+    let swap = || -> Result<()> {
+        fs::create_dir_all(library.join("plugins"))?;
+        fs::rename(&next, &current).with_context(|| format!("cannot write {}", current.display()))?;
+        set_pin(library, &source.name, &to)?;
+        plugins::sync(library)
+    };
+    if let Err(error) = swap() {
+        remove_dir(&current)?;
+        if had_copy {
+            fs::rename(&previous, &current).with_context(|| format!("cannot put {} back. The old copy is in {}.", current.display(), previous.display()))?;
+        }
+        if fs::read_to_string(library.join(FILE)).ok().as_deref() != Some(pins.as_str()) {
+            fs::write(library.join(FILE), &pins).with_context(|| format!("cannot put {FILE} back"))?;
+        }
+        plugins::sync(library).ok();
+        return Err(error.context(format!("accept of {} failed. The library is as it was.", source.name)));
+    }
     Ok(to)
+}
+
+/// The `sources.toml` table for a new source. `spec` is a GitHub
+/// `owner/repo`, a git URL, or a local path. The name is `name`, else the
+/// last part of the repository.
+pub fn new_source(spec: &str, name: Option<&str>, skills: &[&str], home: &Path) -> Result<Source> {
+    let is_url = ["https://", "http://", "ssh://", "git@", "file://"].iter().any(|scheme| spec.starts_with(scheme));
+    let repository = if is_url {
+        spec.to_string()
+    } else if spec.starts_with(['/', '.', '~']) {
+        let path = match spec.strip_prefix("~/") {
+            Some(rest) => home.join(rest),
+            None => std::path::absolute(spec)?,
+        };
+        if !path.is_dir() {
+            bail!("{} is not a folder", path.display());
+        }
+        path.to_string_lossy().into_owned()
+    } else {
+        match spec.split_once('/') {
+            Some((owner, repo)) if is_plain_name(owner) && is_plain_name(repo) => format!("https://github.com/{owner}/{repo}"),
+            _ => bail!("`{spec}` is not owner/repo, a git URL, or a local path"),
+        }
+    };
+    let last = repository.trim_end_matches('/').rsplit(['/', ':']).next().unwrap_or_default().trim_end_matches(".git");
+    let name = name.unwrap_or(last).to_string();
+    if !is_plain_name(&name) {
+        bail!("`{name}` is not a plain folder name. Give one with --name.");
+    }
+    let skills = (!skills.is_empty()).then(|| skills.iter().map(|skill| skill.to_string()).collect());
+    Ok(Source { name, repository, path: String::new(), plugin: false, branch: None, commit: None, skills })
+}
+
+/// An error when the name of `source` belongs to another source or to a
+/// plugin of the library. True when `sources.toml` has this source already.
+pub fn check_new(library: &Path, source: &Source) -> Result<bool> {
+    if let Some(known) = load(library)?.into_iter().find(|known| known.name == source.name) {
+        if known.repository == source.repository {
+            return Ok(true);
+        }
+        bail!("{FILE} has a source named {} from {}. Give another name with --name.", known.name, known.repository);
+    }
+    if plugins::dir(library, &source.name).exists() {
+        bail!("the library has a plugin named {} that is not a source. Give another name with --name.", source.name);
+    }
+    Ok(false)
+}
+
+/// Writes `source` as a new table at the end of `sources.toml`. Comments
+/// stay. A source with the same name and repository is already there, so
+/// nothing changes.
+pub fn write_source(library: &Path, source: &Source) -> Result<()> {
+    if check_new(library, source)? {
+        return Ok(());
+    }
+    let path = library.join(FILE);
+    let text = fs::read_to_string(&path).unwrap_or_default();
+    let mut document: DocumentMut = text.parse().with_context(|| format!("{FILE} is not valid TOML"))?;
+    let mut table = toml_edit::Table::new();
+    table["repository"] = toml_edit::value(&source.repository);
+    if let Some(skills) = &source.skills {
+        table["skills"] = toml_edit::value(skills.iter().collect::<toml_edit::Array>());
+    }
+    document.insert(&source.name, toml_edit::Item::Table(table));
+    fs::write(&path, document.to_string()).with_context(|| format!("cannot write {}", path.display()))
 }
 
 // ---------- cache ----------
@@ -402,7 +496,7 @@ fn is_plain_name(name: &str) -> bool {
 }
 
 #[cfg(test)]
-mod tests {
+pub(crate) mod tests {
     use super::*;
 
     fn run(dir: &Path, args: &[&str]) {
@@ -416,7 +510,7 @@ mod tests {
         assert!(status.success(), "git {args:?}");
     }
 
-    fn commit(repo: &Path, files: &[(&str, &str)], delete: &[&str]) {
+    pub(crate) fn commit(repo: &Path, files: &[(&str, &str)], delete: &[&str]) {
         for (path, text) in files {
             let path = repo.join(path);
             fs::create_dir_all(path.parent().unwrap()).unwrap();
@@ -430,7 +524,7 @@ mod tests {
     }
 
     /// A source repository and a library that names it, in a fresh folder.
-    fn fixture(test: &str, skills: &str) -> (PathBuf, PathBuf) {
+    pub(crate) fn fixture(test: &str, skills: &str) -> (PathBuf, PathBuf) {
         let root = std::env::temp_dir().join(format!("workflow-setup-{test}-{}", std::process::id()));
         fs::remove_dir_all(&root).ok();
         let (upstream, library) = (root.join("upstream"), root.join("library"));
@@ -504,10 +598,66 @@ mod tests {
         let (upstream, library) = fixture("pinned", "");
         let source = find(&library, "up").unwrap();
         let first = fetch(&library, &source).unwrap();
+        assert!(accept(&library, &source).is_err(), "accept took a commit that no diff showed");
+        assert_eq!(diff(&library, &source).unwrap().to, first);
         commit(&upstream, &[("skills/a/one/SKILL.md", "one v2")], &[]);
-        // Not fetched again: the newer commit must not enter.
+        let second = fetch(&library, &source).unwrap();
+        // Fetched again but not shown: the newer commit must not enter.
         assert_eq!(accept(&library, &source).unwrap(), first);
         assert_eq!(read(&library, "plugins/up/skills/one/SKILL.md"), "one v1");
+        assert_eq!(diff(&library, &source).unwrap().to, second);
+        assert_eq!(accept(&library, &source).unwrap(), second);
+        assert_eq!(read(&library, "plugins/up/skills/one/SKILL.md"), "one v2");
+    }
+
+    #[test]
+    fn a_failed_accept_puts_the_old_copy_and_the_old_pin_back() {
+        use std::os::unix::fs::PermissionsExt;
+        let (upstream, library) = fixture("atomic", "");
+        let source = find(&library, "up").unwrap();
+        let first = fetch(&library, &source).unwrap();
+        diff(&library, &source).unwrap();
+        accept(&library, &source).unwrap();
+
+        commit(&upstream, &[("skills/a/one/SKILL.md", "one v2")], &[]);
+        let source = find(&library, "up").unwrap();
+        fetch(&library, &source).unwrap();
+        diff(&library, &source).unwrap();
+        let pins = library.join(FILE);
+        fs::set_permissions(&pins, fs::Permissions::from_mode(0o444)).unwrap();
+        let result = accept(&library, &source);
+        fs::set_permissions(&pins, fs::Permissions::from_mode(0o644)).unwrap();
+
+        assert!(result.is_err(), "accept wrote a read-only sources.toml");
+        assert_eq!(read(&library, "plugins/up/skills/one/SKILL.md"), "one v1", "the old copy did not come back");
+        assert_eq!(find(&library, "up").unwrap().commit.as_deref(), Some(first.as_str()));
+    }
+
+    #[test]
+    fn add_writes_a_new_source_one_time() {
+        let home = Path::new("/h");
+        let github = new_source("mattpocock/skills", None, &["teach"], home).unwrap();
+        assert_eq!((github.name.as_str(), github.repository.as_str()), ("skills", "https://github.com/mattpocock/skills"));
+        assert_eq!(github.skills, Some(vec!["teach".to_string()]));
+        let url = new_source("git@github.com:owner/tools.git", Some("mine"), &[], home).unwrap();
+        assert_eq!((url.name.as_str(), url.skills), ("mine", None));
+        assert_eq!(new_source("https://example.com/x/kit.git", None, &[], home).unwrap().name, "kit");
+        assert!(new_source("not a spec", None, &[], home).is_err());
+        assert!(new_source("/no/such/folder", None, &[], home).is_err());
+
+        let (upstream, library) = fixture("add", "");
+        let local = new_source(upstream.to_str().unwrap(), Some("other"), &["one"], home).unwrap();
+        write_source(&library, &local).unwrap();
+        let text = read(&library, FILE);
+        write_source(&library, &local).unwrap();
+        assert_eq!(read(&library, FILE), text, "a second add changed sources.toml");
+        assert!(text.starts_with("# kept\n") && text.contains("[other]\nrepository = "));
+        assert_eq!(find(&library, "other").unwrap().skills, Some(vec!["one".to_string()]));
+        assert!(write_source(&library, &Source { repository: "/elsewhere".into(), ..local }).is_err(), "a name took a second repository");
+
+        let source = find(&library, "other").unwrap();
+        fetch(&library, &source).unwrap();
+        assert_eq!(diff(&library, &source).unwrap().skills, ["one"]);
     }
 
     #[test]

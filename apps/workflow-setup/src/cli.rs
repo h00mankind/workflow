@@ -11,7 +11,7 @@ use crate::{
     installed, library, manifest, sources,
 };
 
-pub const COMMANDS: &[&str] = &["status", "apply", "list", "install", "remove", "sources", "library", "help", "--help", "-h"];
+pub const COMMANDS: &[&str] = &["status", "apply", "list", "install", "remove", "add", "update", "sources", "library", "help", "--help", "-h"];
 
 const USAGE: &str = "\
 workflow-setup [project-path]          open the window
@@ -30,6 +30,12 @@ workflow-setup remove <entry>... [-g | -p path] [-a agent]...
 workflow-setup remove --foreign <name>... [-g | -p path] [-a agent]...
                                        take out a skill that workflow-setup did not make: unlink
                                        a link, or move a real folder to ~/.Trash
+workflow-setup add <owner/repo | URL | path> [-s skill]... [--name name]
+                                       write a new source to sources.toml, fetch it, and show
+                                       the diff and the skills. --yes: accept the copy.
+                                       --dry-run: do not write sources.toml.
+workflow-setup update [source]...      fetch each source and show the diff. --yes: accept
+                                       the commit that the diff showed.
 workflow-setup library                 list the plugins, their skills, and the names two plugins share
 workflow-setup sources fetch [name]    get the newest commit of each source into the cache
 workflow-setup sources diff [name]     show what the fetched commit would change (--stat: no patch)
@@ -52,6 +58,8 @@ struct Args<'a> {
     global: bool,
     project: Option<&'a str>,
     agents: Vec<&'static Agent>,
+    skills: Vec<&'a str>,
+    name: Option<&'a str>,
 }
 
 impl<'a> Args<'a> {
@@ -64,6 +72,8 @@ impl<'a> Args<'a> {
                 "-g" | "--global" => parsed.global = true,
                 "-p" | "--project" => parsed.project = Some(value()?),
                 "-a" | "--agent" => parsed.agents.push(agents::find(value()?)?),
+                "-s" | "--skill" => parsed.skills.push(value()?),
+                "--name" => parsed.name = Some(value()?),
                 "-h" | "--help" => parsed.words.push("help"),
                 flag if flag.starts_with("--") => parsed.flags.push(flag),
                 flag if flag.starts_with('-') => bail!("`{flag}` is not an option. Run workflow-setup help."),
@@ -112,6 +122,9 @@ pub fn run(args: &[String]) -> Result<()> {
         ["remove", names @ ..] => change(&Env::new(find_library()?), &args, names, &std::env::current_dir()?, false),
         ["status", scopes @ ..] => status(scopes, false, false, true),
         ["apply", scopes @ ..] => status(scopes, !flag("--dry-run"), flag("--adopt"), flag("--dry-run")),
+        ["add", spec] => add(&find_library()?, &args, spec),
+        ["add", ..] => bail!("add takes one source: owner/repo, a git URL, or a local path"),
+        ["update", names @ ..] => each(names, false, |library, source| review(library, source, flag("--yes"))),
         ["sources", "fetch", names @ ..] => each(names, false, |library, source| {
             let commit = sources::fetch(library, source)?;
             let state = if source.commit.as_deref() == Some(&commit) { "at the pin" } else { "newer than the pin" };
@@ -132,6 +145,40 @@ pub fn run(args: &[String]) -> Result<()> {
             Ok(())
         }
     }
+}
+
+/// `add`: writes the source to `sources.toml`, then shows what it would bring.
+fn add(library: &Path, args: &Args, spec: &str) -> Result<()> {
+    let source = sources::new_source(spec, args.name, &args.skills, &crate::scan::home())?;
+    if args.flag("--dry-run") {
+        sources::check_new(library, &source)?;
+        sources::fetch(library, &source)?;
+        print_diff(&source, &sources::diff(library, &source)?, false);
+        println!("dry run: {} did not change", sources::FILE);
+        return Ok(());
+    }
+    sources::write_source(library, &source)?;
+    println!("{}: [{}] from {}", sources::FILE, source.name, source.repository);
+    let source = sources::load(library)?.into_iter().find(|known| known.name == source.name).context("the new source is missing")?;
+    review(library, &source, args.flag("--yes"))
+}
+
+/// Fetches a source and prints the diff without the patch. With `yes`,
+/// accepts the commit that the diff showed.
+fn review(library: &Path, source: &sources::Source, yes: bool) -> Result<()> {
+    sources::fetch(library, source)?;
+    let diff = sources::diff(library, source)?;
+    print_diff(source, &diff, false);
+    if diff.is_empty() {
+        return Ok(());
+    }
+    if !yes {
+        println!("{}: run `workflow-setup sources diff {}` to read the patch. Give --yes to accept.", source.name, source.name);
+        return Ok(());
+    }
+    let commit = sources::accept(library, source)?;
+    println!("{}: plugins/{} is now the copy at {}", source.name, source.name, short(&commit));
+    Ok(())
 }
 
 fn find_library() -> Result<PathBuf> {
@@ -356,6 +403,7 @@ fn print_diff(source: &sources::Source, diff: &sources::Diff, patch: bool) {
         println!("{}: {from} -> {}", source.name, short(&diff.to));
     }
     for (label, names) in [
+        ("skills", &diff.skills),
         ("added", &diff.added),
         ("removed", &diff.removed),
         ("changed", &diff.changed),
@@ -450,6 +498,33 @@ mod tests {
         assert!(command(&env, "install nope -g").is_err(), "an unknown plugin passed");
         assert!(command(&env, "install h00man/nope -g").is_err(), "an unknown skill passed");
         assert!(command(&env, "remove h00man/plan -g").is_err(), "a skill of a whole plugin went out alone");
+    }
+
+    #[test]
+    fn add_and_update_show_the_diff_and_accept_only_with_yes() {
+        let (upstream, library) = sources::tests::fixture("cli-add", "");
+        let spec = upstream.to_string_lossy().into_owned();
+        let parse = |text: String| args(&text);
+
+        let line = parse(format!("add {spec} --name other -s one --dry-run"));
+        add(&library, &Args::parse(&line).unwrap(), &spec).unwrap();
+        assert!(sources::load(&library).unwrap().iter().all(|source| source.name != "other"), "a dry run wrote sources.toml");
+
+        let line = parse(format!("add {spec} --name other -s one"));
+        add(&library, &Args::parse(&line).unwrap(), &spec).unwrap();
+        let source = sources::load(&library).unwrap().into_iter().find(|source| source.name == "other").expect("add wrote no source");
+        assert_eq!(source.skills, Some(vec!["one".to_string()]));
+        assert!(!library.join("plugins/other").exists(), "add without --yes changed the library");
+
+        review(&library, &source, true).unwrap();
+        assert_eq!(fs::read_to_string(library.join("plugins/other/skills/one/SKILL.md")).unwrap(), "one v1");
+
+        sources::tests::commit(&upstream, &[("skills/a/one/SKILL.md", "one v2")], &[]);
+        let source = sources::load(&library).unwrap().into_iter().find(|source| source.name == "other").unwrap();
+        review(&library, &source, false).unwrap();
+        assert_eq!(fs::read_to_string(library.join("plugins/other/skills/one/SKILL.md")).unwrap(), "one v1", "update without --yes accepted");
+        review(&library, &source, true).unwrap();
+        assert_eq!(fs::read_to_string(library.join("plugins/other/skills/one/SKILL.md")).unwrap(), "one v2");
     }
 
     #[test]
