@@ -216,7 +216,7 @@ pub fn accept(library: &Path, source: &Source) -> Result<String> {
         set_pin(library, &source.name, &to)?;
         plugins::sync(library)
     };
-    if let Err(error) = swap() {
+    let restore = || -> Result<()> {
         remove_dir(&current)?;
         if had_copy {
             fs::rename(&previous, &current).with_context(|| format!("cannot put {} back. The old copy is in {}.", current.display(), previous.display()))?;
@@ -225,7 +225,14 @@ pub fn accept(library: &Path, source: &Source) -> Result<String> {
             fs::write(library.join(FILE), &pins).with_context(|| format!("cannot put {FILE} back"))?;
         }
         plugins::sync(library).ok();
-        return Err(error.context(format!("accept of {} failed. The library is as it was.", source.name)));
+        Ok(())
+    };
+    if let Err(error) = swap() {
+        let outcome = match restore() {
+            Ok(()) => "The library is as it was.".to_string(),
+            Err(restore_error) => format!("The restore also failed, so the library is not as it was: {restore_error:#}"),
+        };
+        return Err(error.context(format!("accept of {} failed. {outcome}", source.name)));
     }
     Ok(to)
 }
@@ -628,7 +635,8 @@ pub(crate) mod tests {
         let result = accept(&library, &source);
         fs::set_permissions(&pins, fs::Permissions::from_mode(0o644)).unwrap();
 
-        assert!(result.is_err(), "accept wrote a read-only sources.toml");
+        let message = format!("{:#}", result.expect_err("accept wrote a read-only sources.toml"));
+        assert!(message.contains("The library is as it was.") && message.contains("ermission denied"), "{message}");
         assert_eq!(read(&library, "plugins/up/skills/one/SKILL.md"), "one v1", "the old copy did not come back");
         assert_eq!(find(&library, "up").unwrap().commit.as_deref(), Some(first.as_str()));
     }
