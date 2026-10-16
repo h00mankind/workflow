@@ -263,7 +263,7 @@ pub fn assigned(env: &Env, root: &Path) -> Result<BTreeSet<String>> {
 }
 
 #[derive(Default, Serialize, Deserialize)]
-struct Record {
+pub struct Record {
     /// Scope root to the links installed there, each with its target.
     scopes: BTreeMap<PathBuf, BTreeMap<PathBuf, PathBuf>>,
     /// Plugin to the hash of its content when Codex last copied it.
@@ -275,7 +275,13 @@ struct Record {
 }
 
 impl Record {
-    fn load(env: &Env) -> Record {
+    /// True when the engine owns the link at `path` in the scope at `root`:
+    /// the link points into the library, or the record has it.
+    pub fn owns(&self, env: &Env, root: &Path, path: &Path, link: &Path) -> bool {
+        link.starts_with(&env.library) || self.scopes.get(root).is_some_and(|owned| owned.get(path).is_some_and(|target| target == link))
+    }
+
+    pub fn load(env: &Env) -> Record {
         fs::read_to_string(env.record_file())
             .ok()
             .and_then(|text| serde_json::from_str(&text).ok())
@@ -392,8 +398,7 @@ fn hash_entry(entry: &serde_json::Value) -> u64 {
 fn plan(env: &Env, record: &Record, scope: &Scope, codex_plugins: &BTreeSet<String>) -> Result<Plan> {
     let (links, clashes) = desired_links(&env.library, scope);
 
-    let owned = record.scopes.get(&scope.root);
-    let is_owned = |path: &Path, link: &Path| link.starts_with(&env.library) || owned.is_some_and(|owned| owned.get(path).is_some_and(|target| target == link));
+    let is_owned = |path: &Path, link: &Path| record.owns(env, &scope.root, path, link);
 
     let mut changes = Vec::new();
     for (path, target) in &links {
@@ -649,6 +654,12 @@ fn codex_flags(config: &DocumentMut) -> BTreeMap<String, bool> {
     flags
 }
 
+/// The plugins of this library that the Codex config of the scope at `root`
+/// names, each with its `enabled` value.
+pub fn codex_plugins(root: &Path) -> Result<BTreeMap<String, bool>> {
+    Ok(codex_flags(&read_toml(&root.join(CODEX_CONFIG))?))
+}
+
 /// Sets `[plugins."<plugin>@workflow"] enabled` in a Codex config file, or
 /// removes that table. Keeps the rest of the file as it is.
 pub fn set_codex_flag(file: &Path, plugin: &str, enabled: Option<bool>) -> Result<()> {
@@ -707,7 +718,7 @@ fn hash_dir(dir: &Path) -> u64 {
 }
 
 #[cfg(test)]
-mod tests {
+pub(crate) mod tests {
     use super::*;
 
     const MANIFEST: &str = r#"
@@ -722,7 +733,7 @@ harnesses = ["claude", "codex", "opencode"]
 
     /// A library with two plugins, a home folder, and a `codex` that does to
     /// the home folder what the real one does.
-    fn fixture(test: &str) -> Env {
+    pub(crate) fn fixture(test: &str) -> Env {
         let root = std::env::temp_dir().join(format!("workflow-setup-apply-{test}-{}", std::process::id()));
         fs::remove_dir_all(&root).ok();
         let (library, home) = (root.join("library"), root.join("home"));
@@ -762,7 +773,7 @@ harnesses = ["claude", "codex", "opencode"]
         Env { library, home, data: root.join("data"), codex: Box::new(codex), claude: Box::new(|args| bail!("unexpected claude call: {args:?}")) }
     }
 
-    fn run(env: &Env, adopt: bool) -> Vec<Applied> {
+    pub(crate) fn run(env: &Env, adopt: bool) -> Vec<Applied> {
         apply(env, &plan_all(env).unwrap(), adopt).unwrap().0
     }
 

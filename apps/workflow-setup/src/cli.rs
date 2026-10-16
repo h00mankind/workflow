@@ -5,32 +5,97 @@ use std::path::{Path, PathBuf};
 use anyhow::{Context as _, Result, bail};
 
 use crate::{
+    agents::{self, Agent, Kind},
     apply::{self, Env, Plan},
     config::Config,
-    library, manifest, sources,
+    installed, library, manifest, sources,
 };
 
-pub const COMMANDS: &[&str] = &["status", "apply", "sources", "library", "help", "--help", "-h"];
+pub const COMMANDS: &[&str] = &["status", "apply", "list", "sources", "library", "help", "--help", "-h"];
 
 const USAGE: &str = "\
 workflow-setup [project-path]          open the window
 workflow-setup status [scope]          show the drift between manifest.toml and the disk
 workflow-setup apply [scope]           make the disk match manifest.toml (--dry-run: change nothing;
                                        --adopt: replace a link that something else made)
+workflow-setup list [-g | -p path] [-a agent]...
+                                       show the skills in each agent folder: made by
+                                       workflow-setup or foreign, and the skills.sh source
 workflow-setup library                 list the plugins, their skills, and the names two plugins share
 workflow-setup sources fetch [name]    get the newest commit of each source into the cache
 workflow-setup sources diff [name]     show what the fetched commit would change (--stat: no patch)
 workflow-setup sources accept <name>   write the copy and move the pin (--all: every source)
 
 A scope is `global` or a project path from manifest.toml. Without one: every scope.
+-g is the global scope. -p is a project. Without -g or -p, the scope is the
+project of manifest.toml that holds the current folder. -a names an agent of
+apps/workflow-setup/agents.toml, and you can give it more than one time.
 The library is $WORKFLOW_LIBRARY, or the folder above the current one that
 has sources.toml, or the library the window uses.";
 
+/// The command line, parsed. Options with a value take the next argument.
+#[derive(Default)]
+struct Args<'a> {
+    words: Vec<&'a str>,
+    flags: Vec<&'a str>,
+    global: bool,
+    project: Option<&'a str>,
+    agents: Vec<&'static Agent>,
+}
+
+impl<'a> Args<'a> {
+    fn parse(args: &'a [String]) -> Result<Args<'a>> {
+        let mut parsed = Args::default();
+        let mut args = args.iter().map(String::as_str);
+        while let Some(arg) = args.next() {
+            let mut value = || args.next().with_context(|| format!("{arg} needs a value"));
+            match arg {
+                "-g" | "--global" => parsed.global = true,
+                "-p" | "--project" => parsed.project = Some(value()?),
+                "-a" | "--agent" => parsed.agents.push(agents::find(value()?)?),
+                "-h" | "--help" => parsed.words.push("help"),
+                flag if flag.starts_with("--") => parsed.flags.push(flag),
+                flag if flag.starts_with('-') => bail!("`{flag}` is not an option. Run workflow-setup help."),
+                word => parsed.words.push(word),
+            }
+        }
+        Ok(parsed)
+    }
+
+    fn flag(&self, name: &str) -> bool {
+        self.flags.contains(&name)
+    }
+
+    /// The root of the scope that -g or -p names, and true for the global
+    /// scope. Without either: the manifest project that holds the current folder.
+    fn scope(&self, env: &Env, cwd: &Path) -> Result<(PathBuf, bool)> {
+        let root = match (self.global, self.project) {
+            (true, Some(_)) => bail!("give -g or -p, not both"),
+            (true, None) => return Ok((env.home.clone(), true)),
+            (false, Some(path)) => match path.strip_prefix("~/") {
+                Some(rest) => env.home.join(rest),
+                None => std::path::absolute(path)?,
+            },
+            (false, None) => {
+                let manifest = manifest::load(&env.library, &env.home)?;
+                let projects = manifest.scopes.into_iter().filter(|scope| !scope.global && cwd.starts_with(&scope.root));
+                match projects.max_by_key(|scope| scope.root.components().count()) {
+                    Some(scope) => scope.root,
+                    None => bail!("{} has no project that holds the current folder. Give -g, or -p <project path>.", manifest::FILE),
+                }
+            }
+        };
+        let global = root == env.home;
+        Ok((root, global))
+    }
+}
+
 pub fn run(args: &[String]) -> Result<()> {
-    let words: Vec<&str> = args.iter().map(String::as_str).filter(|arg| !arg.starts_with("--")).collect();
-    let flag = |name: &str| args.iter().any(|arg| arg == name);
-    match words.as_slice() {
-        ["library"] => list(&find_library()?),
+    let args = Args::parse(args)?;
+    let flag = |name: &str| args.flag(name);
+    match args.words.as_slice() {
+        ["library"] => library_list(&find_library()?),
+        ["list"] => list(&args),
         ["status", scopes @ ..] => status(scopes, false, false, true),
         ["apply", scopes @ ..] => status(scopes, !flag("--dry-run"), flag("--adopt"), flag("--dry-run")),
         ["sources", "fetch", names @ ..] => each(names, false, |library, source| {
@@ -139,7 +204,52 @@ fn tilde(env: &Env, path: &Path) -> String {
     apply::tilde(&env.home, path)
 }
 
-fn list(library: &Path) -> Result<()> {
+/// Prints each skill folder of the scope and what is in it.
+fn list(args: &Args) -> Result<()> {
+    let env = Env::new(find_library()?);
+    let (root, global) = args.scope(&env, &std::env::current_dir()?)?;
+    let folders = installed::folders(&env, &root, global, &args.agents);
+    for folder in &folders {
+        let mut names: Vec<&str> = folder.agents.iter().map(|agent| agent.name.as_str()).collect();
+        let readers = match names.len() {
+            0 => "an old folder of workflow-setup. No agent reads it.".to_string(),
+            1..=4 => names.join(", "),
+            count => {
+                names.truncate(3);
+                format!("{}, and {} more", names.join(", "), count - 3)
+            }
+        };
+        println!("{}  ({readers})", tilde(&env, &folder.dir));
+        let width = folder.items.iter().map(|item| item.name.len()).max().unwrap_or(0);
+        for item in &folder.items {
+            let owner = if item.owned { "workflow" } else { "foreign " };
+            let what = match &item.link {
+                Some(link) => match link.strip_prefix(&env.library) {
+                    Ok(inside) => format!("link to {}", inside.display()),
+                    Err(_) => format!("link to {}", tilde(&env, link)),
+                },
+                None => "a real folder".to_string(),
+            };
+            let broken = if item.broken { "  (broken: the target is missing)" } else { "" };
+            let source = item.source.as_deref().map(|source| format!("  (skills.sh: {source})")).unwrap_or_default();
+            println!("  {:width$}  {owner}  {what}{broken}{source}", item.name);
+        }
+    }
+    let codex = agents::of_kind(Kind::CodexPlugin);
+    if args.agents.is_empty() || args.agents.contains(&codex) {
+        let plugins = apply::codex_plugins(&root)?;
+        if !plugins.is_empty() {
+            let names: Vec<String> = plugins.iter().map(|(plugin, on)| if *on { plugin.clone() } else { format!("{plugin} (off)") }).collect();
+            println!("codex plugins of the workflow marketplace in {}: {}", tilde(&env, &root.join(".codex/config.toml")), names.join(" "));
+        }
+    }
+    if folders.is_empty() {
+        println!("{}: no skills", tilde(&env, &root));
+    }
+    Ok(())
+}
+
+fn library_list(library: &Path) -> Result<()> {
     let skills = library::skills(library);
     let (winners, collisions) = library::resolve(&skills);
     for plugin in library::plugins(library) {
@@ -187,4 +297,34 @@ fn print_diff(source: &sources::Source, diff: &sources::Diff, patch: bool) {
 
 fn short(commit: &str) -> &str {
     &commit[..commit.len().min(12)]
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::apply::tests::fixture;
+
+    fn args(text: &str) -> Vec<String> {
+        text.split_whitespace().map(str::to_string).collect()
+    }
+
+    #[test]
+    fn the_scope_is_the_option_or_the_manifest_project_that_holds_the_current_folder() {
+        let env = fixture("cli-scope");
+        let app = env.home.join("app");
+        let scope = |text: &str, cwd: &Path| Args::parse(&args(text)).and_then(|parsed| parsed.scope(&env, cwd));
+        assert_eq!(scope("list", &app.join("src")).unwrap(), (app.clone(), false));
+        assert_eq!(scope("list -g", Path::new("/")).unwrap(), (env.home.clone(), true));
+        assert_eq!(scope("list -p ~/other", Path::new("/")).unwrap(), (env.home.join("other"), false));
+        assert!(scope("list", &env.home).is_err(), "a folder outside every manifest project got a scope");
+        assert!(scope("list -g -p ~/app", &app).is_err());
+
+        let line = args("list -a claude -a cursor --dry-run");
+        let parsed = Args::parse(&line).unwrap();
+        assert_eq!(parsed.agents.iter().map(|agent| agent.name.as_str()).collect::<Vec<_>>(), ["claude-code", "cursor"]);
+        assert!(parsed.flag("--dry-run") && parsed.words == ["list"]);
+        assert!(Args::parse(&args("list -a nope")).is_err());
+        assert!(Args::parse(&args("list -z")).is_err());
+        assert!(Args::parse(&args("list -p")).is_err());
+    }
 }

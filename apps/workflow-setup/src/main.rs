@@ -9,6 +9,7 @@ mod app;
 mod apply;
 mod cli;
 mod config;
+mod installed;
 mod library;
 mod manifest;
 mod mcp;
