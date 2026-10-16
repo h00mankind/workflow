@@ -39,9 +39,11 @@ workflow-setup update [source]...      fetch each source and show the diff. --ye
 workflow-setup library                 list the plugins, their skills, and the names two plugins share
 workflow-setup sources fetch [name]    get the newest commit of each source into the cache
 workflow-setup sources diff [name]     show what the fetched commit would change (--stat: no patch)
-workflow-setup sources accept <name>   write the copy and move the pin (--all: every source)
+workflow-setup sources accept <name>   write the copy of the commit that the last diff showed, and
+                                       move the pin (--all: every source)
 
-A scope is `global` or a project path from manifest.toml. Without one: every scope.
+For status and apply, a scope is `global` or a project path from manifest.toml.
+Without one: every scope.
 An entry is a plugin of the library, or <plugin>/<skill> for one skill. One
 skill installs as one link without a prefix, for every agent.
 -g is the global scope. -p is a project. Without -g or -p, the scope is the
