@@ -16,6 +16,41 @@ pub const GLOBAL: &str = "global";
 /// The keys of a scope that are not agent names.
 const SCOPE_KEYS: [&str; 3] = ["harnesses", "plugins", "mcp"];
 
+/// One item of a list in a scope: a whole plugin, or one skill of a plugin.
+#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
+pub enum Entry {
+    /// `<plugin>`
+    Plugin(String),
+    /// `<plugin>/<skill>`. It installs as one link without a prefix, for every agent.
+    Skill { plugin: String, skill: String },
+}
+
+impl Entry {
+    pub fn parse(text: &str) -> Result<Entry> {
+        let plain = |name: &str| !name.is_empty() && !name.starts_with('.') && name.chars().all(|c| c.is_ascii_alphanumeric() || matches!(c, '-' | '_' | '.'));
+        match text.split_once('/') {
+            None if plain(text) => Ok(Entry::Plugin(text.to_string())),
+            Some((plugin, skill)) if plain(plugin) && plain(skill) => Ok(Entry::Skill { plugin: plugin.to_string(), skill: skill.to_string() }),
+            _ => bail!("`{text}` is not a plugin name or <plugin>/<skill>"),
+        }
+    }
+
+    pub fn plugin(&self) -> &str {
+        match self {
+            Entry::Plugin(plugin) | Entry::Skill { plugin, .. } => plugin,
+        }
+    }
+}
+
+impl std::fmt::Display for Entry {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Entry::Plugin(plugin) => write!(f, "{plugin}"),
+            Entry::Skill { plugin, skill } => write!(f, "{plugin}/{skill}"),
+        }
+    }
+}
+
 #[derive(Debug, Default)]
 pub struct Manifest {
     pub scopes: Vec<Scope>,
@@ -30,12 +65,12 @@ pub struct Scope {
     pub global: bool,
     /// The agents of the scope, from `harnesses`.
     pub agents: Vec<&'static Agent>,
-    /// Plugins for every agent of the scope.
-    pub plugins: Vec<String>,
+    /// Plugins and skills for every agent of the scope.
+    pub plugins: Vec<Entry>,
     /// Servers for every agent of the scope that supports MCP.
     pub mcp: Vec<String>,
-    /// More plugins, for one agent only.
-    pub only: BTreeMap<&'static Agent, Vec<String>>,
+    /// More plugins and skills, for one agent only.
+    pub only: BTreeMap<&'static Agent, Vec<Entry>>,
 }
 
 impl Scope {
@@ -54,17 +89,23 @@ impl Scope {
         }
     }
 
-    /// The plugins this scope assigns to `agent`, each one time.
-    pub fn plugins_for(&self, agent: &Agent) -> Vec<String> {
-        let mut plugins = Vec::new();
+    /// The plugins and skills this scope assigns to `agent`, each one time.
+    pub fn entries_for(&self, agent: &Agent) -> Vec<Entry> {
+        let mut entries = Vec::new();
         if self.agents.contains(&agent) {
-            for plugin in self.plugins.iter().chain(self.only.get(agent).into_iter().flatten()) {
-                if !plugins.contains(plugin) {
-                    plugins.push(plugin.clone());
+            for entry in self.plugins.iter().chain(self.only.get(agent).into_iter().flatten()) {
+                if !entries.contains(entry) {
+                    entries.push(entry.clone());
                 }
             }
         }
-        plugins
+        entries
+    }
+
+    /// The whole plugins this scope assigns to `agent`.
+    pub fn plugins_for(&self, agent: &Agent) -> Vec<String> {
+        let entries = self.entries_for(agent).into_iter();
+        entries.filter_map(|entry| if let Entry::Plugin(plugin) = entry { Some(plugin) } else { None }).collect()
     }
 
     /// True when an agent of this kind is in the scope.
@@ -109,6 +150,9 @@ fn scope(label: &str, root: PathBuf, global: bool, table: &Table) -> Result<Scop
         Some(items) => strings(items, key),
         None => Ok(Vec::new()),
     };
+    let entries = |key: &str| -> Result<Vec<Entry>> {
+        list(key)?.iter().map(|text| Entry::parse(text).with_context(|| format!("{label}: `{key}`"))).collect()
+    };
     let mut scope_agents: Vec<&'static Agent> = Vec::new();
     match table.get("harnesses") {
         Some(keys) => {
@@ -121,10 +165,10 @@ fn scope(label: &str, root: PathBuf, global: bool, table: &Table) -> Result<Scop
         }
         None => scope_agents = agents::default(),
     }
-    let mut only: BTreeMap<&'static Agent, Vec<String>> = BTreeMap::new();
+    let mut only: BTreeMap<&'static Agent, Vec<Entry>> = BTreeMap::new();
     for (key, _) in table.iter().filter(|(key, _)| !SCOPE_KEYS.contains(key)) {
         let agent = agents::find(key).with_context(|| format!("{label}: `{key}` is not a key of a scope"))?;
-        let extra = list(key)?;
+        let extra = entries(key)?;
         if !extra.is_empty() && !scope_agents.contains(&agent) {
             bail!("{label}: `{key}` has plugins, but `harnesses` does not name it");
         }
@@ -136,7 +180,7 @@ fn scope(label: &str, root: PathBuf, global: bool, table: &Table) -> Result<Scop
             bail!("{label}: {} has no skill folder at global scope", agent.name);
         }
     }
-    Ok(Scope { label: label.to_string(), root, global, agents: scope_agents, plugins: list("plugins")?, mcp: list("mcp")?, only })
+    Ok(Scope { label: label.to_string(), root, global, agents: scope_agents, plugins: entries("plugins")?, mcp: list("mcp")?, only })
 }
 
 fn strings(item: &Toml, name: &str) -> Result<Vec<String>> {
@@ -243,5 +287,17 @@ mod tests {
         assert!(parse("[global]\ncursor = [\"a\"]\n", home).is_err(), "an agent outside `harnesses` got plugins");
         assert!(parse("[global]\nharnesses = [\"eve\"]\n", home).is_err(), "an agent without a global folder passed at global scope");
         assert!(parse("[global]\nharnesses = [\"opencode\"]\n", home).is_ok());
+    }
+
+    #[test]
+    fn an_entry_is_a_plugin_or_one_skill_of_a_plugin() {
+        let scope = &parse("[global]\nplugins = [\"h00man\", \"pstack/swarm\"]\n", Path::new("/h")).unwrap().scopes[0];
+        let skill = Entry::Skill { plugin: "pstack".into(), skill: "swarm".into() };
+        assert_eq!(scope.entries_for(agents::find("codex").unwrap()), [Entry::Plugin("h00man".into()), skill.clone()]);
+        assert_eq!(scope.plugins_for(agents::find("codex").unwrap()), ["h00man"]);
+        assert_eq!(skill.to_string(), "pstack/swarm");
+        for bad in ["", "a/b/c", "/b", "a/", "../x"] {
+            assert!(Entry::parse(bad).is_err(), "`{bad}` passed");
+        }
     }
 }

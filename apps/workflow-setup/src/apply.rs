@@ -23,7 +23,7 @@ use crate::{
     adapters::mcp::Format as McpFormat,
     agents::{self, Kind},
     library,
-    manifest::{self, Scope},
+    manifest::{self, Entry, Scope},
     mcp,
     plugins::{self, MARKETPLACE},
 };
@@ -200,13 +200,15 @@ fn desired_links(library: &Path, scope: &Scope) -> (BTreeMap<PathBuf, PathBuf>, 
     let mut wants: BTreeMap<PathBuf, Vec<Want>> = BTreeMap::new();
     for &agent in &scope.agents {
         let Some(dir) = agent.skill_dir(&scope.root, scope.global) else { continue };
-        for plugin in scope.plugins_for(agent) {
-            let rank = order.iter().position(|known| *known == plugin).unwrap_or(usize::MAX);
-            let mut want = |name: &str, target: PathBuf| wants.entry(dir.join(name)).or_default().push(Want { rank, plugin: plugin.clone(), target });
-            match agent.kind {
-                Kind::ClaudePlugin => want(&plugin, plugins::dir(library, &plugin)),
-                Kind::CodexPlugin => {}
-                Kind::Skills => {
+        for entry in scope.entries_for(agent) {
+            let plugin = entry.plugin();
+            let rank = order.iter().position(|known| known == plugin).unwrap_or(usize::MAX);
+            let mut want = |name: &str, target: PathBuf| wants.entry(dir.join(name)).or_default().push(Want { rank, plugin: plugin.to_string(), target });
+            match (agent.kind, &entry) {
+                (_, Entry::Skill { skill, .. }) => want(skill, plugins::dir(library, plugin).join("skills").join(skill)),
+                (Kind::ClaudePlugin, Entry::Plugin(_)) => want(plugin, plugins::dir(library, plugin)),
+                (Kind::CodexPlugin, Entry::Plugin(_)) => {}
+                (Kind::Skills, Entry::Plugin(_)) => {
                     for skill in skills.iter().filter(|skill| skill.origin == plugin) {
                         want(&skill.name, skill.dir.clone());
                     }
@@ -305,13 +307,10 @@ pub fn plan_all(env: &Env) -> Result<Vec<Plan>> {
             scopes.push(Scope::empty(root.clone(), &env.home));
         }
     }
-    let known = library::plugins(&env.library);
     let servers = mcp::load(&env.library)?;
     for scope in &scopes {
-        for plugin in scope.agents.iter().flat_map(|agent| scope.plugins_for(agent)) {
-            if !known.contains(&plugin) {
-                bail!("{}: {} names the plugin {plugin}, which the library does not have", scope.label, manifest::FILE);
-            }
+        for entry in scope.agents.iter().flat_map(|agent| scope.entries_for(agent)) {
+            check_entry(&env.library, &entry).with_context(|| format!("{}: {}", scope.label, manifest::FILE))?;
         }
         for server in &scope.mcp {
             if !servers.contains_key(server) {
@@ -327,6 +326,20 @@ pub fn plan_all(env: &Env) -> Result<Vec<Plan>> {
         plan_mcp(&record, &servers, &mut plan)?;
         Ok(plan)
     }).collect()
+}
+
+/// An error when the library does not have the plugin or the skill.
+pub fn check_entry(library: &Path, entry: &Entry) -> Result<()> {
+    let plugin = entry.plugin();
+    if !library::plugins(library).iter().any(|known| known == plugin) {
+        bail!("the library has no plugin {plugin}");
+    }
+    if let Entry::Skill { skill, .. } = entry {
+        if !library::skills(library).iter().any(|item| item.origin == plugin && item.name == *skill) {
+            bail!("the plugin {plugin} has no skill {skill}");
+        }
+    }
+    Ok(())
 }
 
 fn plan_mcp(record: &Record, servers: &BTreeMap<String, mcp::Server>, plan: &mut Plan) -> Result<()> {
@@ -916,6 +929,26 @@ harnesses = ["claude", "codex", "opencode"]
         run(&env, false);
         assert_eq!(target(&env, "app/.agents/skills/unslop"), "plugins/h00man/skills/unslop", "the clash took the wrong winner");
         assert!(in_sync(&env));
+    }
+
+    #[test]
+    fn a_single_skill_is_one_link_without_a_prefix_for_every_kind() {
+        let env = fixture("single");
+        fs::write(env.library.join(manifest::FILE), "[global]\nplugins = [\"pstack/swarm\"]\n[project.\"~/app\"]\nplugins = [\"h00man/plan\"]\nharnesses = [\"claude\", \"codex\", \"cursor\"]\n").unwrap();
+        run(&env, false);
+        assert_eq!(target(&env, ".claude/skills/swarm"), "plugins/pstack/skills/swarm");
+        assert_eq!(target(&env, ".agents/skills/swarm"), "plugins/pstack/skills/swarm", "Codex did not get the skill in its global folder");
+        assert_eq!(target(&env, "app/.claude/skills/plan"), "plugins/h00man/skills/plan");
+        assert_eq!(target(&env, "app/.agents/skills/plan"), "plugins/h00man/skills/plan");
+        assert!(env.home.join(".claude/skills/pstack").symlink_metadata().is_err(), "a single skill installed its whole plugin");
+        assert!(!env.home.join(".codex/plugins/cache/workflow/pstack").exists(), "a single skill installed its plugin in Codex");
+        assert!(!read(&env, CODEX_CONFIG).contains("pstack@workflow"));
+        assert!(in_sync(&env));
+
+        for bad in ["h00man/nope", "nope/plan"] {
+            fs::write(env.library.join(manifest::FILE), format!("[global]\nplugins = [\"{bad}\"]\n")).unwrap();
+            assert!(plan_all(&env).is_err(), "{bad} passed");
+        }
     }
 
     #[test]
