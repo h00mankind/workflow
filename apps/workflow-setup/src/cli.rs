@@ -11,7 +11,7 @@ use crate::{
     installed, library, manifest, sources,
 };
 
-pub const COMMANDS: &[&str] = &["status", "apply", "list", "sources", "library", "help", "--help", "-h"];
+pub const COMMANDS: &[&str] = &["status", "apply", "list", "install", "remove", "sources", "library", "help", "--help", "-h"];
 
 const USAGE: &str = "\
 workflow-setup [project-path]          open the window
@@ -21,12 +21,23 @@ workflow-setup apply [scope]           make the disk match manifest.toml (--dry-
 workflow-setup list [-g | -p path] [-a agent]...
                                        show the skills in each agent folder: made by
                                        workflow-setup or foreign, and the skills.sh source
+workflow-setup install <entry>... [-g | -p path] [-a agent]...
+                                       add the entries to the scope in manifest.toml, then apply
+                                       that scope (--dry-run: change nothing)
+workflow-setup remove <entry>... [-g | -p path] [-a agent]...
+                                       take the entries out of the scope in manifest.toml, then
+                                       apply that scope. Only links that workflow-setup made go.
+workflow-setup remove --foreign <name>... [-g | -p path] [-a agent]...
+                                       take out a skill that workflow-setup did not make: unlink
+                                       a link, or move a real folder to ~/.Trash
 workflow-setup library                 list the plugins, their skills, and the names two plugins share
 workflow-setup sources fetch [name]    get the newest commit of each source into the cache
 workflow-setup sources diff [name]     show what the fetched commit would change (--stat: no patch)
 workflow-setup sources accept <name>   write the copy and move the pin (--all: every source)
 
 A scope is `global` or a project path from manifest.toml. Without one: every scope.
+An entry is a plugin of the library, or <plugin>/<skill> for one skill. One
+skill installs as one link without a prefix, for every agent.
 -g is the global scope. -p is a project. Without -g or -p, the scope is the
 project of manifest.toml that holds the current folder. -a names an agent of
 apps/workflow-setup/agents.toml, and you can give it more than one time.
@@ -96,6 +107,9 @@ pub fn run(args: &[String]) -> Result<()> {
     match args.words.as_slice() {
         ["library"] => library_list(&find_library()?),
         ["list"] => list(&args),
+        ["install", names @ ..] => change(&Env::new(find_library()?), &args, names, &std::env::current_dir()?, true),
+        ["remove", names @ ..] if flag("--foreign") => remove_foreign(&Env::new(find_library()?), &args, names, &std::env::current_dir()?),
+        ["remove", names @ ..] => change(&Env::new(find_library()?), &args, names, &std::env::current_dir()?, false),
         ["status", scopes @ ..] => status(scopes, false, false, true),
         ["apply", scopes @ ..] => status(scopes, !flag("--dry-run"), flag("--adopt"), flag("--dry-run")),
         ["sources", "fetch", names @ ..] => each(names, false, |library, source| {
@@ -164,16 +178,84 @@ fn status(names: &[&str], write: bool, adopt: bool, show: bool) -> Result<()> {
         }
     }
     if write {
-        let (results, backup) = apply::apply(&env, &plans, adopt)?;
-        for (plan, applied) in plans.iter().zip(results) {
-            let mut line = format!("{}: {} written, {} removed", plan.scope.label, applied.written, applied.removed);
-            if applied.left > 0 {
-                line.push_str(&format!(", {} left because workflow-setup does not own them", applied.left));
-            }
-            println!("{line}");
+        write_plans(&env, &plans, adopt)?;
+    }
+    Ok(())
+}
+
+fn write_plans(env: &Env, plans: &[Plan], adopt: bool) -> Result<()> {
+    let (results, backup) = apply::apply(env, plans, adopt)?;
+    for (plan, applied) in plans.iter().zip(results) {
+        let mut line = format!("{}: {} written, {} removed", plan.scope.label, applied.written, applied.removed);
+        if applied.left > 0 {
+            line.push_str(&format!(", {} left because workflow-setup does not own them", applied.left));
         }
-        if let Some(backup) = backup {
-            println!("backup: {}", tilde(&env, &backup));
+        println!("{line}");
+    }
+    if let Some(backup) = backup {
+        println!("backup: {}", tilde(env, &backup));
+    }
+    Ok(())
+}
+
+/// `install` and `remove`: edits the scope in the manifest, then makes the
+/// scope match. The global scope comes too when the scope has Codex,
+/// because Codex keeps one copy of each plugin for all scopes.
+fn change(env: &Env, args: &Args, names: &[&str], cwd: &Path, add: bool) -> Result<()> {
+    if names.is_empty() {
+        bail!("name a plugin, or <plugin>/<skill>");
+    }
+    let entries = names.iter().map(|name| manifest::Entry::parse(name)).collect::<Result<Vec<_>>>()?;
+    let (root, _) = args.scope(env, cwd)?;
+    let text = manifest::edit(&manifest::read(&env.library), &env.home, &root, &entries, &args.agents, add)?;
+    let before = manifest::load(&env.library, &env.home)?.scopes.into_iter().find(|scope| scope.root == root);
+    let shared = before.as_ref().map(|scope| scope.plugins.iter().map(ToString::to_string).collect::<Vec<_>>().join(" ")).unwrap_or_default();
+    for agent in args.agents.iter().filter(|agent| add && !before.as_ref().is_some_and(|scope| scope.agents.contains(agent))) {
+        if !shared.is_empty() {
+            println!("note: {} goes into `harnesses`, so it also gets `plugins`: {shared}", agent.name);
+        }
+    }
+    let mut plans = apply::plan_manifest(env, manifest::parse(&text, &env.home)?)?;
+    let codex = plans.iter().any(|plan| plan.scope.root == root && plan.scope.has(Kind::CodexPlugin));
+    plans.retain(|plan| plan.scope.root == root || plan.scope.global && codex);
+    for plan in &plans {
+        print_plan(env, plan);
+    }
+    if args.flag("--dry-run") {
+        println!("dry run: {} and the disk did not change", manifest::FILE);
+        return Ok(());
+    }
+    manifest::write(&env.library, &text)?;
+    println!("{}: written", manifest::FILE);
+    write_plans(env, &plans, args.flag("--adopt"))
+}
+
+/// `remove --foreign`: takes items that workflow-setup did not make out of
+/// the skill folders of the scope. A link goes. A real folder moves to the Trash.
+fn remove_foreign(env: &Env, args: &Args, names: &[&str], cwd: &Path) -> Result<()> {
+    if names.is_empty() {
+        bail!("name a skill folder. `list` shows them.");
+    }
+    let (root, global) = args.scope(env, cwd)?;
+    let folders = installed::folders(env, &root, global, &args.agents);
+    for name in names {
+        let items: Vec<&installed::Item> = folders.iter().flat_map(|folder| &folder.items).filter(|item| item.name == *name).collect();
+        if items.is_empty() {
+            bail!("no skill folder of {} has {name}", tilde(env, &root));
+        }
+        for item in items {
+            let path = tilde(env, &item.path);
+            if item.owned {
+                println!("{path}: workflow-setup made it. Use remove without --foreign.");
+                continue;
+            }
+            let verb = if item.link.is_some() { "unlink" } else { "move to the Trash" };
+            if args.flag("--dry-run") {
+                println!("{path}: would {verb}");
+                continue;
+            }
+            crate::ops::remove(&item.path, &env.home)?;
+            println!("{path}: {}", if item.link.is_some() { "unlinked" } else { "moved to the Trash" });
         }
     }
     Ok(())
@@ -301,6 +383,8 @@ fn short(commit: &str) -> &str {
 
 #[cfg(test)]
 mod tests {
+    use std::fs;
+
     use super::*;
     use crate::apply::tests::fixture;
 
@@ -326,5 +410,64 @@ mod tests {
         assert!(Args::parse(&args("list -a nope")).is_err());
         assert!(Args::parse(&args("list -z")).is_err());
         assert!(Args::parse(&args("list -p")).is_err());
+    }
+
+    fn command(env: &Env, text: &str) -> Result<()> {
+        let line = args(text);
+        let parsed = Args::parse(&line)?;
+        let names = &parsed.words[1..];
+        match parsed.words[0] {
+            "install" => change(env, &parsed, names, Path::new("/"), true),
+            "remove" if parsed.flag("--foreign") => remove_foreign(env, &parsed, names, Path::new("/")),
+            "remove" => change(env, &parsed, names, Path::new("/"), false),
+            other => bail!("the test does not know {other}"),
+        }
+    }
+
+    #[test]
+    fn install_and_remove_edit_the_manifest_then_apply_and_a_dry_run_changes_nothing() {
+        let env = fixture("cli-install");
+        apply::tests::run(&env, false);
+        let manifest_text = || manifest::read(&env.library);
+        let before = manifest_text();
+        let link = env.home.join(".cursor/skills/swarm");
+
+        command(&env, "install pstack/swarm -g -a cursor --dry-run").unwrap();
+        assert_eq!(manifest_text(), before);
+        assert!(link.symlink_metadata().is_err(), "a dry run made a link");
+
+        command(&env, "install pstack/swarm -g -a cursor").unwrap();
+        assert!(manifest_text().contains("harnesses = [\"claude\", \"codex\", \"cursor\"]"));
+        assert_eq!(fs::read_link(&link).unwrap(), env.library.join("plugins/pstack/skills/swarm"));
+        // An agent in `harnesses` also gets what `plugins` gives every agent.
+        assert!(env.home.join(".cursor/skills/plan").symlink_metadata().is_ok());
+        assert!(apply::plan_all(&env).unwrap().iter().all(Plan::in_sync));
+
+        command(&env, "remove pstack/swarm -g -a cursor").unwrap();
+        assert!(link.symlink_metadata().is_err(), "remove left the link");
+        assert!(apply::plan_all(&env).unwrap().iter().all(Plan::in_sync));
+
+        assert!(command(&env, "install nope -g").is_err(), "an unknown plugin passed");
+        assert!(command(&env, "install h00man/nope -g").is_err(), "an unknown skill passed");
+        assert!(command(&env, "remove h00man/plan -g").is_err(), "a skill of a whole plugin went out alone");
+    }
+
+    #[test]
+    fn remove_foreign_moves_a_real_folder_to_the_trash_and_leaves_owned_links() {
+        let env = fixture("cli-foreign");
+        apply::tests::run(&env, false);
+        let foreign = env.home.join(".agents/skills/find-skills");
+        fs::create_dir_all(&foreign).unwrap();
+
+        command(&env, "remove --foreign find-skills -g --dry-run").unwrap();
+        assert!(foreign.is_dir(), "a dry run moved the folder");
+        command(&env, "remove --foreign find-skills -g").unwrap();
+        assert!(!foreign.exists());
+        let trash: Vec<String> = fs::read_dir(env.home.join(".Trash")).unwrap().flatten().map(|entry| entry.file_name().to_string_lossy().into_owned()).collect();
+        assert!(trash.len() == 1 && trash[0].starts_with("find-skills "), "{trash:?}");
+
+        command(&env, "remove --foreign pstack -g").unwrap();
+        assert!(env.home.join(".claude/skills/pstack").symlink_metadata().is_ok(), "--foreign took an owned link");
+        assert!(command(&env, "remove --foreign nothing -g").is_err());
     }
 }

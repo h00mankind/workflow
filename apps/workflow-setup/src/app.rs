@@ -243,7 +243,9 @@ impl Manager {
     /// it out, then makes that project match.
     fn assign(&mut self, item: String, on: bool, cx: &mut Context<Self>) {
         let (Some(env), Some(root)) = (self.env(), self.project.as_ref().map(|project| project.root.clone())) else { return };
-        let result = manifest::assign(&env.library, &env.home, &root, &item, on)
+        let entry = manifest::Entry::Plugin(item.clone());
+        let result = manifest::edit(&manifest::read(&env.library), &env.home, &root, &[entry], &[], on)
+            .and_then(|text| manifest::write(&env.library, &text))
             .and_then(|()| self.apply_scope(&env, &root, false))
             .map(|done| format!("{} {item}. {done}", if on { "Assigned" } else { "Took out" }));
         self.finish(result, cx);
@@ -519,7 +521,7 @@ impl Manager {
 
     fn remove(&mut self, removal: Removal, cx: &mut Context<Self>) {
         let result = match &removal {
-            Removal::Path { path, .. } => ops::remove(path).map(|removed| match removed {
+            Removal::Path { path, .. } => ops::remove(path, &crate::scan::home()).map(|removed| match removed {
                 Removed::Unlinked => format!("Removed the link {}", self.show(path)),
                 Removed::Trashed => format!("Moved {} to the Trash", self.show(path)),
             }),

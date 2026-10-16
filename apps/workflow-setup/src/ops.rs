@@ -10,7 +10,7 @@ use std::{
 use anyhow::{Context as _, Result, bail};
 use serde_json::{Map, Value};
 
-use crate::scan::{home, strip_json_comments};
+use crate::scan::strip_json_comments;
 
 /// Writes `text` to `path`, unless the file changed after the app read `seen`.
 pub fn save(path: &Path, seen: &str, text: &str) -> Result<()> {
@@ -49,8 +49,8 @@ pub fn copy(from: &Path, to: &Path) -> Result<()> {
 }
 
 /// Takes `path` out of the project. A symlink is unlinked and its target
-/// stays. A real file or folder moves to the Trash, so it can come back.
-pub fn remove(path: &Path) -> Result<Removed> {
+/// stays. A real file or folder moves to the Trash of `home`, so it can come back.
+pub fn remove(path: &Path, home: &Path) -> Result<Removed> {
     let meta = path
         .symlink_metadata()
         .with_context(|| format!("{} is not there", path.display()))?;
@@ -62,9 +62,10 @@ pub fn remove(path: &Path) -> Result<Removed> {
         .duration_since(UNIX_EPOCH)
         .map(|since| since.as_secs())
         .unwrap_or_default();
-    let trashed = home()
+    let trashed = home
         .join(".Trash")
         .join(format!("{} {stamp}", file_name(path)));
+    make_parent(&trashed)?;
     fs::rename(path, &trashed).with_context(|| format!("cannot move {} to the Trash", path.display()))?;
     Ok(Removed::Trashed)
 }

@@ -21,6 +21,7 @@ pub struct Folder {
 
 pub struct Item {
     pub name: String,
+    pub path: PathBuf,
     /// The link target. None: a real file or folder.
     pub link: Option<PathBuf>,
     /// True when workflow-setup made it.
@@ -69,7 +70,7 @@ pub fn folders(env: &Env, root: &Path, global: bool, only: &[&'static Agent]) ->
                 false => lock["skills"][&name]["source"].as_str().map(str::to_string),
             };
             let broken = link.is_some() && !path.exists();
-            folder.items.push(Item { name, link, owned, broken, source });
+            folder.items.push(Item { name, path, link, owned, broken, source });
         }
     }
     folders.retain(|folder| !folder.items.is_empty());

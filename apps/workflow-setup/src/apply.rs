@@ -299,7 +299,12 @@ impl Record {
 /// manifest, then each project that left the manifest and still has
 /// installed items.
 pub fn plan_all(env: &Env) -> Result<Vec<Plan>> {
-    let manifest = manifest::load(&env.library, &env.home)?;
+    plan_manifest(env, manifest::load(&env.library, &env.home)?)
+}
+
+/// `plan_all` for a manifest that is not on the disk yet, such as the
+/// result of an edit in a dry run.
+pub fn plan_manifest(env: &Env, manifest: manifest::Manifest) -> Result<Vec<Plan>> {
     let record = Record::load(env);
     let mut scopes = vec![Scope::empty(env.home.clone(), &env.home)];
     for scope in manifest.scopes {
