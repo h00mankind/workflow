@@ -643,7 +643,7 @@ fn hash_dir(dir: &Path) -> u64 {
 }
 
 #[cfg(test)]
-pub(crate) mod tests {
+mod tests {
     use super::*;
 
     const MANIFEST: &str = r#"
@@ -658,7 +658,7 @@ harnesses = ["claude", "codex", "opencode"]
 
     /// A library with two plugins, a home folder, and a `codex` that does to
     /// the home folder what the real one does.
-    pub(crate) fn fixture(test: &str) -> Env {
+    fn fixture(test: &str) -> Env {
         let root = std::env::temp_dir().join(format!("workflow-setup-apply-{test}-{}", std::process::id()));
         fs::remove_dir_all(&root).ok();
         let (library, home) = (root.join("library"), root.join("home"));
@@ -831,7 +831,7 @@ harnesses = ["claude", "codex", "opencode"]
         assert!(!env.home.join(".claude").exists());
     }
 
-    pub(crate) fn mcp_fixture(test: &str) -> Env {
+    fn mcp_fixture(test: &str) -> Env {
         let mut env = fixture(test);
         fs::create_dir_all(env.library.join("mcp")).unwrap();
         fs::write(env.library.join("mcp/local.toml"), "command = \"npx\"\nargs = [\"-y\", \"some-mcp\"]\nenv = [\"GITHUB_TOKEN\"]\n").unwrap();

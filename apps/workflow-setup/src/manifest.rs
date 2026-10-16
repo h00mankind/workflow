@@ -139,17 +139,6 @@ fn strings(item: &Toml, name: &str) -> Result<Vec<String>> {
 /// or takes it out for all of them. Writes `manifest.toml` and keeps its
 /// comments. A project that the manifest does not have gets a table.
 pub fn assign(library: &Path, home: &Path, root: &Path, plugin: &str, on: bool) -> Result<()> {
-    let keys: Vec<&str> = std::iter::once("plugins").chain(Harness::ALL.iter().map(|harness| harness.key())).collect();
-    assign_list(library, home, root, plugin, on, &keys)
-}
-
-/// Assigns a server to the scope, or takes it out. Like `assign`, keeps
-/// comments, creates a missing project table, and adds a name only once.
-pub fn assign_mcp(library: &Path, home: &Path, root: &Path, server: &str, on: bool) -> Result<()> {
-    assign_list(library, home, root, server, on, &["mcp"])
-}
-
-fn assign_list(library: &Path, home: &Path, root: &Path, name: &str, on: bool, keys: &[&str]) -> Result<()> {
     let path = library.join(FILE);
     let text = fs::read_to_string(&path).unwrap_or_default();
     let manifest = parse(&text, home)?;
@@ -173,16 +162,16 @@ fn assign_list(library: &Path, home: &Path, root: &Path, name: &str, on: bool, k
     let table = table.as_table_mut().context("the scope is not a table")?;
 
     if on {
-        let list = table.entry(keys[0]).or_insert(toml_edit::value(toml_edit::Array::new()));
-        let list = list.as_array_mut().with_context(|| format!("`{}` is not a list", keys[0]))?;
-        if !list.iter().any(|value| value.as_str() == Some(name)) {
-            list.push(name);
+        let list = table.entry("plugins").or_insert(toml_edit::value(toml_edit::Array::new()));
+        let list = list.as_array_mut().context("`plugins` is not a list")?;
+        if !list.iter().any(|value| value.as_str() == Some(plugin)) {
+            list.push(plugin);
         }
     } else {
-        for &key in keys {
+        for key in std::iter::once("plugins").chain(Harness::ALL.iter().map(|harness| harness.key())) {
             if let Some(list) = table.get_mut(key).and_then(Toml::as_array_mut) {
-                list.retain(|value| value.as_str() != Some(name));
-                if list.is_empty() && key != keys[0] {
+                list.retain(|value| value.as_str() != Some(plugin));
+                if list.is_empty() && key != "plugins" {
                     table.remove(key);
                 }
             }
@@ -194,32 +183,6 @@ fn assign_list(library: &Path, home: &Path, root: &Path, name: &str, on: bool, k
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[test]
-    fn a_switch_assigns_mcp_once_and_creates_a_missing_project() {
-        let env = crate::apply::tests::mcp_fixture("manifest-mcp");
-        let file = env.library.join(FILE);
-        fs::write(&file, "# kept\n[global]\nplugins = [\"h00man\"]\nclaude = [\"pstack\"]\nmcp = [\"local\", \"remote\"] # servers kept\n").unwrap();
-        assign_mcp(&env.library, &env.home, &env.home, "local", false).unwrap();
-        assign_mcp(&env.library, &env.home, &env.home, "local", false).unwrap();
-        assign_mcp(&env.library, &env.home, &env.home, "remote", true).unwrap();
-        let scope = load(&env.library, &env.home).unwrap().scopes.remove(0);
-        assert_eq!(scope.mcp, ["remote"]);
-        assert_eq!(scope.plugins_for(Harness::Claude), ["h00man", "pstack"], "MCP assignment changed plugins");
-
-        let project = env.home.join("new-app");
-        assign_mcp(&env.library, &env.home, &project, "local", true).unwrap();
-        assign_mcp(&env.library, &env.home, &project, "local", true).unwrap();
-        let scope = load(&env.library, &env.home).unwrap().scopes.remove(1);
-        assert_eq!(scope.label, "~/new-app");
-        assert_eq!(scope.root, project);
-        assert_eq!(scope.mcp, ["local"]);
-        assign_mcp(&env.library, &env.home, &project, "local", false).unwrap();
-        assert!(load(&env.library, &env.home).unwrap().scopes[1].mcp.is_empty());
-        let text = fs::read_to_string(file).unwrap();
-        assert!(text.starts_with("# kept\n") && text.contains("# servers kept"), "{text}");
-        assert!(text.contains("[project.\"~/new-app\"]\nmcp = []"), "{text}");
-    }
 
     #[test]
     fn a_switch_assigns_a_plugin_or_takes_it_out() {

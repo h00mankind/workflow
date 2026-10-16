@@ -72,18 +72,6 @@ The record owns each MCP entry by its file, server name, and value hash. A forei
 
 `apply` owns a link when its record has it, or when the link points into this library. In a Codex config file it owns the entries of the `workflow` marketplace. It never changes or removes an item it does not own: a link that something else made is a conflict until `--adopt`, and a real file or folder is never replaced. Before it changes a link or a config file, it writes the old state to a backup. The record and the backups are in `~/Library/Application Support/workflow-setup/`. A second `apply` changes nothing.
 
-## MCP server
-
-An agent harness can run the engine as a stdio MCP server. It offers `library`, `manifest`, `status`, and `sources` to read state; `assign_plugin` and `assign_mcp` to edit only assignments in `manifest.toml`; and `apply` to install them. `apply` is a dry run unless `dry_run` is false, and it never adopts foreign items. Source updates stay with the human: fetch, diff, and accept are not tools.
-
-After building, configure the harness to run this exact command. The binary path is machine-specific; change it and the library path on another machine.
-
-```bash
-env WORKFLOW_LIBRARY=/Users/h0_0man/Documents/h00man.code/workflow /Users/h0_0man/Documents/h00man.code/workflow/apps/workflow-setup/target/debug/workflow-setup mcp-server
-```
-
-The server uses MCP revision `2025-11-25`, with the `initialize` handshake and newline-delimited JSON-RPC on stdin and stdout.
-
 ## My skills
 
 **`plugins/h00man/skills/` — my own skills**, edited here. After an edit, run `workflow-setup apply` so that Codex gets the change.

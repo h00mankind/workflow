@@ -11,7 +11,6 @@ mod config;
 mod library;
 mod manifest;
 mod mcp;
-mod mcp_server;
 mod ops;
 mod plugins;
 mod scan;
