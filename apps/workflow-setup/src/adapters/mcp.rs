@@ -10,8 +10,7 @@ use anyhow::{Context as _, Result, bail};
 use serde_json::{Value, json};
 use toml_edit::{DocumentMut, Item, Table};
 
-use super::Harness;
-use crate::{manifest::Scope, mcp::Server, scan::strip_json_comments};
+use crate::{agents::Kind, manifest::Scope, mcp::Server, scan::strip_json_comments};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Format {
@@ -27,8 +26,8 @@ pub struct Config {
 }
 
 pub fn configs(scope: &Scope) -> Vec<Config> {
-    let claude = scope.harnesses.contains(&Harness::Claude);
-    let codex = scope.harnesses.contains(&Harness::Codex);
+    let claude = scope.has(Kind::ClaudePlugin);
+    let codex = scope.has(Kind::CodexPlugin);
     let mut configs = vec![
         Config {
             file: scope.root.join(if scope.global { ".claude.json" } else { ".mcp.json" }),

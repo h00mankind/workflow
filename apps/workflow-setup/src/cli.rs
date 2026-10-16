@@ -122,8 +122,8 @@ fn is_scope(env: &Env, plan: &Plan, name: &str) -> bool {
 fn print_plan(env: &Env, plan: &Plan) {
     let root = tilde(env, &plan.scope.root);
     let title = if plan.scope.global { format!("global ({root})") } else { root };
-    for collision in &plan.collisions {
-        println!("{title}: opencode has no prefix. {} is in {} and {}. {} wins.", collision.name, collision.winner, collision.losers.join(", "), collision.winner);
+    for clash in &plan.clashes {
+        println!("{title}: {} is in {} and {}. {} wins.", tilde(env, &clash.path), clash.winner, clash.losers.join(", "), clash.winner);
     }
     if plan.in_sync() {
         println!("{title}: in sync");

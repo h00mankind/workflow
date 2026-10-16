@@ -9,10 +9,12 @@ use std::{
 use anyhow::{Context as _, Result, bail};
 use toml_edit::{DocumentMut, Item as Toml, Table};
 
-use crate::adapters::Harness;
+use crate::agents::{self, Agent, Kind};
 
 pub const FILE: &str = "manifest.toml";
 pub const GLOBAL: &str = "global";
+/// The keys of a scope that are not agent names.
+const SCOPE_KEYS: [&str; 3] = ["harnesses", "plugins", "mcp"];
 
 #[derive(Debug, Default)]
 pub struct Manifest {
@@ -26,13 +28,14 @@ pub struct Scope {
     pub label: String,
     pub root: PathBuf,
     pub global: bool,
-    pub harnesses: Vec<Harness>,
-    /// Plugins for every harness of the scope.
+    /// The agents of the scope, from `harnesses`.
+    pub agents: Vec<&'static Agent>,
+    /// Plugins for every agent of the scope.
     pub plugins: Vec<String>,
-    /// Servers for every harness of the scope that supports MCP.
+    /// Servers for every agent of the scope that supports MCP.
     pub mcp: Vec<String>,
-    /// More plugins, for one harness only.
-    pub only: BTreeMap<Harness, Vec<String>>,
+    /// More plugins, for one agent only.
+    pub only: BTreeMap<&'static Agent, Vec<String>>,
 }
 
 impl Scope {
@@ -44,24 +47,29 @@ impl Scope {
             label: if global { GLOBAL.to_string() } else { root.to_string_lossy().into_owned() },
             root,
             global,
-            harnesses: Vec::new(),
+            agents: Vec::new(),
             plugins: Vec::new(),
             mcp: Vec::new(),
             only: BTreeMap::new(),
         }
     }
 
-    /// The plugins this scope assigns to `harness`, each one time.
-    pub fn plugins_for(&self, harness: Harness) -> Vec<String> {
+    /// The plugins this scope assigns to `agent`, each one time.
+    pub fn plugins_for(&self, agent: &Agent) -> Vec<String> {
         let mut plugins = Vec::new();
-        if self.harnesses.contains(&harness) {
-            for plugin in self.plugins.iter().chain(self.only.get(&harness).into_iter().flatten()) {
+        if self.agents.contains(&agent) {
+            for plugin in self.plugins.iter().chain(self.only.get(agent).into_iter().flatten()) {
                 if !plugins.contains(plugin) {
                     plugins.push(plugin.clone());
                 }
             }
         }
         plugins
+    }
+
+    /// True when an agent of this kind is in the scope.
+    pub fn has(&self, kind: Kind) -> bool {
+        self.agents.iter().any(|agent| agent.kind == kind)
     }
 }
 
@@ -74,7 +82,7 @@ pub fn load(library: &Path, home: &Path) -> Result<Manifest> {
     parse(&text, home)
 }
 
-fn parse(text: &str, home: &Path) -> Result<Manifest> {
+pub fn parse(text: &str, home: &Path) -> Result<Manifest> {
     let document: DocumentMut = text.parse().with_context(|| format!("{FILE} is not valid TOML"))?;
     let mut manifest = Manifest::default();
     if let Some(table) = document.get(GLOBAL).and_then(Toml::as_table) {
@@ -101,30 +109,34 @@ fn scope(label: &str, root: PathBuf, global: bool, table: &Table) -> Result<Scop
         Some(items) => strings(items, key),
         None => Ok(Vec::new()),
     };
-    let harnesses = match table.get("harnesses") {
-        Some(keys) => strings(keys, "harnesses")?
-            .iter()
-            .map(|key| Harness::from_key(key))
-            .collect::<Result<Vec<_>>>()?,
-        None => Harness::DEFAULT.to_vec(),
-    };
-    let mut only = BTreeMap::new();
-    for harness in Harness::ALL {
-        let extra = list(harness.key())?;
-        if !extra.is_empty() {
-            if !harnesses.contains(&harness) {
-                bail!("{label}: `{}` has plugins, but `harnesses` does not name it", harness.key());
+    let mut scope_agents: Vec<&'static Agent> = Vec::new();
+    match table.get("harnesses") {
+        Some(keys) => {
+            for key in strings(keys, "harnesses")? {
+                let agent = agents::find(&key).with_context(|| format!("{label}: `harnesses` names {key}"))?;
+                if !scope_agents.contains(&agent) {
+                    scope_agents.push(agent);
+                }
             }
-            only.insert(harness, extra);
+        }
+        None => scope_agents = agents::default(),
+    }
+    let mut only: BTreeMap<&'static Agent, Vec<String>> = BTreeMap::new();
+    for (key, _) in table.iter().filter(|(key, _)| !SCOPE_KEYS.contains(key)) {
+        let agent = agents::find(key).with_context(|| format!("{label}: `{key}` is not a key of a scope"))?;
+        let extra = list(key)?;
+        if !extra.is_empty() && !scope_agents.contains(&agent) {
+            bail!("{label}: `{key}` has plugins, but `harnesses` does not name it");
+        }
+        only.entry(agent).or_default().extend(extra);
+    }
+    only.retain(|_, extra| !extra.is_empty());
+    if global {
+        if let Some(agent) = scope_agents.iter().find(|agent| agent.global.is_none()) {
+            bail!("{label}: {} has no skill folder at global scope", agent.name);
         }
     }
-    let scope = Scope { label: label.to_string(), root, global, harnesses, plugins: list("plugins")?, mcp: list("mcp")?, only };
-    for harness in &scope.harnesses {
-        if global && !harness.installs_globally() {
-            bail!("{label}: workflow-setup does not install for {} at global scope", harness.key());
-        }
-    }
-    Ok(scope)
+    Ok(Scope { label: label.to_string(), root, global, agents: scope_agents, plugins: list("plugins")?, mcp: list("mcp")?, only })
 }
 
 fn strings(item: &Toml, name: &str) -> Result<Vec<String>> {
@@ -135,7 +147,7 @@ fn strings(item: &Toml, name: &str) -> Result<Vec<String>> {
         .collect()
 }
 
-/// Assigns `plugin` to the scope at `root` for every harness of the scope,
+/// Assigns `plugin` to the scope at `root` for every agent of the scope,
 /// or takes it out for all of them. Writes `manifest.toml` and keeps its
 /// comments. A project that the manifest does not have gets a table.
 pub fn assign(library: &Path, home: &Path, root: &Path, plugin: &str, on: bool) -> Result<()> {
@@ -168,11 +180,12 @@ pub fn assign(library: &Path, home: &Path, root: &Path, plugin: &str, on: bool) 
             list.push(plugin);
         }
     } else {
-        for key in std::iter::once("plugins").chain(Harness::ALL.iter().map(|harness| harness.key())) {
-            if let Some(list) = table.get_mut(key).and_then(Toml::as_array_mut) {
+        let keys: Vec<String> = table.iter().map(|(key, _)| key.to_string()).filter(|key| key == "plugins" || agents::find(key).is_ok()).collect();
+        for key in keys {
+            if let Some(list) = table.get_mut(&key).and_then(Toml::as_array_mut) {
                 list.retain(|value| value.as_str() != Some(plugin));
                 if list.is_empty() && key != "plugins" {
-                    table.remove(key);
+                    table.remove(&key);
                 }
             }
         }
@@ -191,27 +204,44 @@ mod tests {
         let (library, home) = (root.join("library"), root.join("home"));
         fs::create_dir_all(&library).unwrap();
         fs::write(library.join(FILE), "# kept\n[global]\nplugins = [\"h00man\"]\nclaude = [\"pstack\"]\n").unwrap();
-        let plugins = |root: &Path, harness: Harness| -> Vec<String> {
+        let plugins = |root: &Path, agent: &str| -> Vec<String> {
             let manifest = load(&library, &home).unwrap();
-            manifest.scopes.iter().find(|scope| scope.root == root).map(|scope| scope.plugins_for(harness)).unwrap_or_default()
+            let agent = agents::find(agent).unwrap();
+            manifest.scopes.iter().find(|scope| scope.root == root).map(|scope| scope.plugins_for(agent)).unwrap_or_default()
         };
-        assert_eq!(plugins(&home, Harness::Claude), ["h00man", "pstack"]);
-        assert_eq!(plugins(&home, Harness::Codex), ["h00man"]);
-        assert_eq!(plugins(&home, Harness::OpenCode), Vec::<String>::new(), "a harness the scope does not name got plugins");
+        assert_eq!(plugins(&home, "claude"), ["h00man", "pstack"]);
+        assert_eq!(plugins(&home, "codex"), ["h00man"]);
+        assert_eq!(plugins(&home, "opencode"), Vec::<String>::new(), "an agent the scope does not name got plugins");
 
-        // Out takes the plugin from every harness of the scope.
+        // Out takes the plugin from every agent of the scope.
         assign(&library, &home, &home, "pstack", false).unwrap();
-        assert_eq!(plugins(&home, Harness::Claude), ["h00man"]);
+        assert_eq!(plugins(&home, "claude"), ["h00man"]);
         assign(&library, &home, &home, "matt", true).unwrap();
         assign(&library, &home, &home, "matt", true).unwrap();
-        assert_eq!(plugins(&home, Harness::Codex), ["h00man", "matt"]);
+        assert_eq!(plugins(&home, "codex"), ["h00man", "matt"]);
         assert!(fs::read_to_string(library.join(FILE)).unwrap().starts_with("# kept\n"));
 
         // A project that the manifest does not have gets a table.
         let app = home.join("app");
         assign(&library, &home, &app, "matt", true).unwrap();
-        assert_eq!(plugins(&app, Harness::Claude), ["matt"]);
+        assert_eq!(plugins(&app, "claude"), ["matt"]);
         assert!(fs::read_to_string(library.join(FILE)).unwrap().contains("[project.\"~/app\"]\nplugins = [\"matt\"]"));
-        assert_eq!(plugins(&home, Harness::Codex), ["h00man", "matt"]);
+        assert_eq!(plugins(&home, "codex"), ["h00man", "matt"]);
+    }
+
+    #[test]
+    fn any_agent_of_the_table_works_in_harnesses_and_as_a_key() {
+        let home = Path::new("/h");
+        let text = "[project.\"~/app\"]\nharnesses = [\"claude\", \"cursor\", \"claude-code\"]\nclaude = [\"a\"]\nclaude-code = [\"b\"]\ncursor = [\"c\"]\n";
+        let scope = &parse(text, home).unwrap().scopes[0];
+        assert_eq!(scope.agents.iter().map(|agent| agent.name.as_str()).collect::<Vec<_>>(), ["claude-code", "cursor"]);
+        assert_eq!(scope.plugins_for(agents::find("claude").unwrap()), ["a", "b"]);
+        assert_eq!(scope.plugins_for(agents::find("cursor").unwrap()), ["c"]);
+
+        assert!(parse("[global]\nharnesses = [\"nope\"]\n", home).is_err());
+        assert!(parse("[global]\nplugin = [\"typo\"]\n", home).is_err(), "an unknown key passed");
+        assert!(parse("[global]\ncursor = [\"a\"]\n", home).is_err(), "an agent outside `harnesses` got plugins");
+        assert!(parse("[global]\nharnesses = [\"eve\"]\n", home).is_err(), "an agent without a global folder passed at global scope");
+        assert!(parse("[global]\nharnesses = [\"opencode\"]\n", home).is_ok());
     }
 }

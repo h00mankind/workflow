@@ -20,7 +20,8 @@ use serde::{Deserialize, Serialize};
 use toml_edit::DocumentMut;
 
 use crate::{
-    adapters::{Harness, LINK_DIRS, mcp::Format as McpFormat},
+    adapters::mcp::Format as McpFormat,
+    agents::{self, Kind},
     library,
     manifest::{self, Scope},
     mcp,
@@ -105,9 +106,9 @@ pub enum Change {
 pub struct Plan {
     pub scope: Scope,
     pub changes: Vec<Change>,
-    /// Skill names that two assigned plugins supply where skills install
-    /// without a prefix. The first plugin wins.
-    pub collisions: Vec<library::Collision>,
+    /// Link paths that two assigned plugins want with different targets.
+    /// The first plugin in the library's order wins.
+    pub clashes: Vec<Clash>,
     /// Every link the manifest assigns in this scope, with its target.
     links: BTreeMap<PathBuf, PathBuf>,
     /// True when the manifest assigns something here that is not a link.
@@ -172,6 +173,72 @@ impl Plan {
     }
 }
 
+/// Two or more plugins want the same link path with different targets.
+/// Only the winner gets the path.
+#[derive(Debug, PartialEq, Eq)]
+pub struct Clash {
+    pub path: PathBuf,
+    pub winner: String,
+    pub losers: Vec<String>,
+}
+
+/// One link that the manifest wants, before clashes are resolved.
+struct Want {
+    /// The plugin's place in the library's order of precedence.
+    rank: usize,
+    plugin: String,
+    target: PathBuf,
+}
+
+/// Every link that the manifest assigns in `scope`, keyed by its path. Two
+/// agents that read the same folder share one link. Where two plugins want
+/// the same path, the first in the library's order wins and the rest are
+/// clashes. The kind of each agent decides what a whole plugin becomes.
+fn desired_links(library: &Path, scope: &Scope) -> (BTreeMap<PathBuf, PathBuf>, Vec<Clash>) {
+    let order = library::plugins(library);
+    let skills = library::skills(library);
+    let mut wants: BTreeMap<PathBuf, Vec<Want>> = BTreeMap::new();
+    for &agent in &scope.agents {
+        let Some(dir) = agent.skill_dir(&scope.root, scope.global) else { continue };
+        for plugin in scope.plugins_for(agent) {
+            let rank = order.iter().position(|known| *known == plugin).unwrap_or(usize::MAX);
+            let mut want = |name: &str, target: PathBuf| wants.entry(dir.join(name)).or_default().push(Want { rank, plugin: plugin.clone(), target });
+            match agent.kind {
+                Kind::ClaudePlugin => want(&plugin, plugins::dir(library, &plugin)),
+                Kind::CodexPlugin => {}
+                Kind::Skills => {
+                    for skill in skills.iter().filter(|skill| skill.origin == plugin) {
+                        want(&skill.name, skill.dir.clone());
+                    }
+                }
+            }
+        }
+    }
+    let mut links = BTreeMap::new();
+    let mut clashes = Vec::new();
+    for (path, mut candidates) in wants {
+        candidates.sort_by_key(|want| want.rank);
+        let winner = &candidates[0];
+        let mut losers: Vec<String> = Vec::new();
+        for loser in candidates.iter().filter(|want| want.target != winner.target) {
+            if !losers.contains(&loser.plugin) {
+                losers.push(loser.plugin.clone());
+            }
+        }
+        if !losers.is_empty() {
+            clashes.push(Clash { path: path.clone(), winner: winner.plugin.clone(), losers });
+        }
+        links.insert(path, winner.target.clone());
+    }
+    (links, clashes)
+}
+
+/// Every folder in a scope where the engine makes links or made them before.
+fn link_dirs(scope: &Scope) -> BTreeSet<PathBuf> {
+    let table = agents::all().iter().filter_map(|agent| agent.skill_dir(&scope.root, scope.global));
+    table.chain(agents::LEGACY_DIRS.iter().map(|dir| scope.root.join(dir))).collect()
+}
+
 /// A path as the user reads it: from `~` when it is in the home folder.
 pub fn tilde(home: &Path, path: &Path) -> String {
     match path.strip_prefix(home) {
@@ -182,14 +249,14 @@ pub fn tilde(home: &Path, path: &Path) -> String {
 }
 
 /// The plugins that the manifest assigns to the scope at `root`, for one
-/// harness or more.
+/// agent or more.
 pub fn assigned(env: &Env, root: &Path) -> Result<BTreeSet<String>> {
     let manifest = manifest::load(&env.library, &env.home)?;
     Ok(manifest
         .scopes
         .iter()
         .filter(|scope| scope.root == root)
-        .flat_map(|scope| Harness::ALL.into_iter().flat_map(|harness| scope.plugins_for(harness)))
+        .flat_map(|scope| scope.agents.iter().flat_map(|agent| scope.plugins_for(agent)))
         .collect())
 }
 
@@ -241,7 +308,7 @@ pub fn plan_all(env: &Env) -> Result<Vec<Plan>> {
     let known = library::plugins(&env.library);
     let servers = mcp::load(&env.library)?;
     for scope in &scopes {
-        for plugin in Harness::ALL.into_iter().flat_map(|harness| scope.plugins_for(harness)) {
+        for plugin in scope.agents.iter().flat_map(|agent| scope.plugins_for(agent)) {
             if !known.contains(&plugin) {
                 bail!("{}: {} names the plugin {plugin}, which the library does not have", scope.label, manifest::FILE);
             }
@@ -253,7 +320,8 @@ pub fn plan_all(env: &Env) -> Result<Vec<Plan>> {
         }
     }
     // Codex keeps one copy of a plugin for all scopes.
-    let codex_plugins: BTreeSet<String> = scopes.iter().flat_map(|scope| scope.plugins_for(Harness::Codex)).collect();
+    let codex = agents::of_kind(Kind::CodexPlugin);
+    let codex_plugins: BTreeSet<String> = scopes.iter().flat_map(|scope| scope.plugins_for(codex)).collect();
     scopes.iter().map(|scope| {
         let mut plan = plan(env, &record, scope, &codex_plugins)?;
         plan_mcp(&record, &servers, &mut plan)?;
@@ -309,24 +377,7 @@ fn hash_entry(entry: &serde_json::Value) -> u64 {
 }
 
 fn plan(env: &Env, record: &Record, scope: &Scope, codex_plugins: &BTreeSet<String>) -> Result<Plan> {
-    let mut links: BTreeMap<PathBuf, PathBuf> = BTreeMap::new();
-    let mut collisions = Vec::new();
-    for &harness in &scope.harnesses {
-        let assigned = scope.plugins_for(harness);
-        if let Some(dir) = harness.plugin_link_dir() {
-            for plugin in &assigned {
-                links.insert(scope.root.join(dir).join(plugin), plugins::dir(&env.library, plugin));
-            }
-        }
-        if let Some(dir) = harness.skill_link_dir() {
-            let skills: Vec<_> = library::skills(&env.library).into_iter().filter(|skill| assigned.contains(&skill.origin)).collect();
-            let (winners, collided) = library::resolve(&skills);
-            for (name, item) in winners {
-                links.insert(scope.root.join(dir).join(name), item.dir);
-            }
-            collisions.extend(collided);
-        }
-    }
+    let (links, clashes) = desired_links(&env.library, scope);
 
     let owned = record.scopes.get(&scope.root);
     let is_owned = |path: &Path, link: &Path| link.starts_with(&env.library) || owned.is_some_and(|owned| owned.get(path).is_some_and(|target| target == link));
@@ -344,8 +395,8 @@ fn plan(env: &Env, record: &Record, scope: &Scope, codex_plugins: &BTreeSet<Stri
             foreign_link => changes.push(Change::Conflict { path: path.clone(), target: target.clone(), foreign_link }),
         }
     }
-    for dir in LINK_DIRS {
-        let mut entries: Vec<PathBuf> = fs::read_dir(scope.root.join(dir)).into_iter().flatten().flatten().map(|entry| entry.path()).collect();
+    for dir in link_dirs(scope) {
+        let mut entries: Vec<PathBuf> = fs::read_dir(dir).into_iter().flatten().flatten().map(|entry| entry.path()).collect();
         entries.sort();
         for path in entries {
             if links.contains_key(&path) {
@@ -359,7 +410,7 @@ fn plan(env: &Env, record: &Record, scope: &Scope, codex_plugins: &BTreeSet<Stri
         }
     }
 
-    let assigned = scope.plugins_for(Harness::Codex);
+    let assigned = scope.plugins_for(agents::of_kind(Kind::CodexPlugin));
     let file = scope.root.join(CODEX_CONFIG);
     let config = read_toml(&file)?;
     let flags = codex_flags(&config);
@@ -402,7 +453,7 @@ fn plan(env: &Env, record: &Record, scope: &Scope, codex_plugins: &BTreeSet<Stri
         }
     }
 
-    Ok(Plan { scope: scope.clone(), changes, collisions, links, keeps_record: !assigned.is_empty() })
+    Ok(Plan { scope: scope.clone(), changes, clashes, links, keeps_record: !assigned.is_empty() })
 }
 
 /// What `apply` did in one scope.
@@ -727,10 +778,10 @@ harnesses = ["claude", "codex", "opencode"]
         assert_eq!(target(&env, ".claude/skills/h00man"), "plugins/h00man");
         assert_eq!(target(&env, ".claude/skills/pstack"), "plugins/pstack");
         assert_eq!(target(&env, "app/.claude/skills/pstack"), "plugins/pstack");
-        // opencode gets one link per skill, and the first plugin wins a name.
-        assert_eq!(target(&env, "app/.opencode/skill/unslop"), "plugins/h00man/skills/unslop");
-        assert_eq!(target(&env, "app/.opencode/skill/swarm"), "plugins/pstack/skills/swarm");
-        assert_eq!(plan_all(&env).unwrap()[1].collisions.len(), 1);
+        // opencode gets one link per skill in .agents/skills, and the first plugin wins a name.
+        assert_eq!(target(&env, "app/.agents/skills/unslop"), "plugins/h00man/skills/unslop");
+        assert_eq!(target(&env, "app/.agents/skills/swarm"), "plugins/pstack/skills/swarm");
+        assert_eq!(plan_all(&env).unwrap()[1].clashes.len(), 1);
         // Codex has both plugins. pstack is on for the project only.
         assert!(env.home.join(".codex/plugins/cache/workflow/pstack").is_dir());
         let global = read(&env, CODEX_CONFIG);
@@ -782,7 +833,7 @@ harnesses = ["claude", "codex", "opencode"]
         assert!(skills.join("pstack").symlink_metadata().is_err());
         assert!(skills.join("by-hand").is_dir(), "apply removed a folder it does not own");
         assert!(skills.join("from-a-plugin").symlink_metadata().is_ok(), "apply removed a link it does not own");
-        assert!(env.home.join("app/.opencode/skill/plan").symlink_metadata().is_err());
+        assert!(env.home.join("app/.agents/skills/plan").symlink_metadata().is_err());
         assert!(!env.home.join("app/.codex/config.toml").exists());
         assert!(!env.home.join(".codex/plugins/cache/workflow/pstack").exists());
         let global = read(&env, CODEX_CONFIG);
@@ -829,6 +880,55 @@ harnesses = ["claude", "codex", "opencode"]
         fs::write(env.library.join(manifest::FILE), "[global]\nplugins = [\"nope\"]\n").unwrap();
         assert!(plan_all(&env).is_err());
         assert!(!env.home.join(".claude").exists());
+    }
+
+    #[test]
+    fn old_opencode_links_move_to_the_folder_that_the_agent_table_gives() {
+        let env = fixture("migrate");
+        let old = env.home.join("app/.opencode/skill");
+        fs::create_dir_all(&old).unwrap();
+        for skill in ["plan", "swarm"] {
+            let origin = if skill == "plan" { "h00man" } else { "pstack" };
+            std::os::unix::fs::symlink(env.library.join("plugins").join(origin).join("skills").join(skill), old.join(skill)).unwrap();
+        }
+        let removes = plan_all(&env).unwrap()[1].changes.iter().filter(|change| matches!(change, Change::Remove { path, .. } if path.starts_with(&old))).count();
+        assert_eq!(removes, 2);
+        run(&env, false);
+        assert_eq!(fs::read_dir(&old).unwrap().count(), 0, "an old opencode link stayed");
+        assert_eq!(target(&env, "app/.agents/skills/plan"), "plugins/h00man/skills/plan");
+        assert_eq!(target(&env, "app/.agents/skills/swarm"), "plugins/pstack/skills/swarm");
+        assert!(in_sync(&env));
+    }
+
+    #[test]
+    fn agents_that_share_a_folder_share_one_link_and_a_clash_is_reported_once() {
+        let env = fixture("shared");
+        fs::write(env.library.join(manifest::FILE), "[project.\"~/app\"]\nplugins = [\"pstack\", \"h00man\"]\nharnesses = [\"opencode\", \"cursor\", \"amp\", \"zed\"]\n").unwrap();
+        let plan = &plan_all(&env).unwrap()[1];
+        let dir = env.home.join("app/.agents/skills");
+        let mut linked: Vec<_> = plan.changes.iter().filter_map(|change| match change {
+            Change::Link { path, .. } => Some(path.strip_prefix(&dir).unwrap().to_string_lossy().into_owned()),
+            _ => None,
+        }).collect();
+        linked.sort();
+        assert_eq!(linked, ["plan", "swarm", "unslop"]);
+        assert_eq!(plan.clashes, [Clash { path: dir.join("unslop"), winner: "h00man".into(), losers: vec!["pstack".into()] }]);
+        run(&env, false);
+        assert_eq!(target(&env, "app/.agents/skills/unslop"), "plugins/h00man/skills/unslop", "the clash took the wrong winner");
+        assert!(in_sync(&env));
+    }
+
+    #[test]
+    fn the_repo_manifest_parses_and_is_in_sync_after_one_apply() {
+        let env = fixture("repo-manifest");
+        let dir = env.library.join("plugins/matt/skills/teach");
+        fs::create_dir_all(&dir).unwrap();
+        fs::write(dir.join("SKILL.md"), "teach").unwrap();
+        fs::write(env.library.join(manifest::FILE), include_str!("../../../manifest.toml")).unwrap();
+        run(&env, false);
+        assert_eq!(target(&env, "Documents/h00man.code/workflow/.agents/skills/teach"), "plugins/matt/skills/teach");
+        assert_eq!(target(&env, ".claude/skills/pstack"), "plugins/pstack");
+        assert!(in_sync(&env));
     }
 
     fn mcp_fixture(test: &str) -> Env {

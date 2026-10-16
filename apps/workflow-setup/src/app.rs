@@ -339,7 +339,7 @@ impl Manager {
                     key: plan.scope.root.to_string_lossy().into_owned(),
                     title: if plan.scope.global { "Global".to_string() } else { apply::tilde(&scan::home(), &plan.scope.root) },
                     description: if plan.in_sync() { "In sync with the manifest".to_string() } else { format!("{} to change", plan.changes.len()) },
-                    detail: plan.scope.harnesses.iter().map(|harness| harness.key()).collect::<Vec<_>>().join(" · "),
+                    detail: plan.scope.agents.iter().map(|agent| agent.key()).collect::<Vec<_>>().join(" · "),
                     warning: (!plan.in_sync()).then_some("drift"),
                 })
                 .collect(),
@@ -1063,12 +1063,12 @@ impl Manager {
             actions = actions.child(button("adopt", "Apply and adopt", true));
         }
         let mut pane = summary(&title, &state).child(actions);
-        for collision in &plan.collisions {
-            pane = pane.child(Callout::new(Severity::Info).title(format!("{} is in two plugins", collision.name)).child(format!(
-                "{} and {} supply it. opencode has no prefix, so {} wins there.",
-                collision.winner,
-                collision.losers.join(", "),
-                collision.winner
+        for clash in &plan.clashes {
+            pane = pane.child(Callout::new(Severity::Info).title(format!("{} is in two plugins", apply::tilde(&home, &clash.path))).child(format!(
+                "{} and {} supply it. The link has no prefix, so {} wins there.",
+                clash.winner,
+                clash.losers.join(", "),
+                clash.winner
             )));
         }
         for (label, names) in plan.groups(&home) {
