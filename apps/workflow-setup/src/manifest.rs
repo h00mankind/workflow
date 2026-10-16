@@ -63,13 +63,13 @@ pub struct Scope {
     pub label: String,
     pub root: PathBuf,
     pub global: bool,
-    /// The agents of the scope, from `harnesses`.
-    pub agents: Vec<&'static Agent>,
-    /// Plugins and skills for every agent of the scope.
+    /// The agents that get `plugins` and `mcp`: from `harnesses`, else the default.
+    pub harnesses: Vec<&'static Agent>,
+    /// Plugins and skills for each agent of `harnesses`.
     pub plugins: Vec<Entry>,
-    /// Servers for every agent of the scope that supports MCP.
+    /// Servers for each agent of `harnesses` that supports MCP.
     pub mcp: Vec<String>,
-    /// More plugins and skills, for one agent only.
+    /// Plugins and skills for one agent only. The agent need not be in `harnesses`.
     pub only: BTreeMap<&'static Agent, Vec<Entry>>,
 }
 
@@ -82,21 +82,28 @@ impl Scope {
             label: if global { GLOBAL.to_string() } else { root.to_string_lossy().into_owned() },
             root,
             global,
-            agents: Vec::new(),
+            harnesses: Vec::new(),
             plugins: Vec::new(),
             mcp: Vec::new(),
             only: BTreeMap::new(),
         }
     }
 
+    /// Every agent that gets something in this scope: `harnesses`, then
+    /// each agent with a list of its own.
+    pub fn agents(&self) -> Vec<&'static Agent> {
+        let mut all = self.harnesses.clone();
+        all.extend(self.only.keys().filter(|agent| !self.harnesses.contains(agent)));
+        all
+    }
+
     /// The plugins and skills this scope assigns to `agent`, each one time.
     pub fn entries_for(&self, agent: &Agent) -> Vec<Entry> {
+        let shared = if self.harnesses.contains(&agent) { self.plugins.as_slice() } else { &[] };
         let mut entries = Vec::new();
-        if self.agents.contains(&agent) {
-            for entry in self.plugins.iter().chain(self.only.get(agent).into_iter().flatten()) {
-                if !entries.contains(entry) {
-                    entries.push(entry.clone());
-                }
+        for entry in shared.iter().chain(self.only.get(agent).into_iter().flatten()) {
+            if !entries.contains(entry) {
+                entries.push(entry.clone());
             }
         }
         entries
@@ -108,9 +115,9 @@ impl Scope {
         entries.filter_map(|entry| if let Entry::Plugin(plugin) = entry { Some(plugin) } else { None }).collect()
     }
 
-    /// True when an agent of this kind is in the scope.
+    /// True when an agent of this kind gets something in the scope.
     pub fn has(&self, kind: Kind) -> bool {
-        self.agents.iter().any(|agent| agent.kind == kind)
+        self.agents().iter().any(|agent| agent.kind == kind)
     }
 }
 
@@ -153,34 +160,31 @@ fn scope(label: &str, root: PathBuf, global: bool, table: &Table) -> Result<Scop
     let entries = |key: &str| -> Result<Vec<Entry>> {
         list(key)?.iter().map(|text| Entry::parse(text).with_context(|| format!("{label}: `{key}`"))).collect()
     };
-    let mut scope_agents: Vec<&'static Agent> = Vec::new();
+    let mut harnesses: Vec<&'static Agent> = Vec::new();
     match table.get("harnesses") {
         Some(keys) => {
             for key in strings(keys, "harnesses")? {
                 let agent = agents::find(&key).with_context(|| format!("{label}: `harnesses` names {key}"))?;
-                if !scope_agents.contains(&agent) {
-                    scope_agents.push(agent);
+                if !harnesses.contains(&agent) {
+                    harnesses.push(agent);
                 }
             }
         }
-        None => scope_agents = agents::default(),
+        None => harnesses = agents::default(),
     }
     let mut only: BTreeMap<&'static Agent, Vec<Entry>> = BTreeMap::new();
     for (key, _) in table.iter().filter(|(key, _)| !SCOPE_KEYS.contains(key)) {
         let agent = agents::find(key).with_context(|| format!("{label}: `{key}` is not a key of a scope"))?;
-        let extra = entries(key)?;
-        if !extra.is_empty() && !scope_agents.contains(&agent) {
-            bail!("{label}: `{key}` has plugins, but `harnesses` does not name it");
-        }
-        only.entry(agent).or_default().extend(extra);
+        only.entry(agent).or_default().extend(entries(key)?);
     }
     only.retain(|_, extra| !extra.is_empty());
+    let scope = Scope { label: label.to_string(), root, global, harnesses, plugins: entries("plugins")?, mcp: list("mcp")?, only };
     if global {
-        if let Some(agent) = scope_agents.iter().find(|agent| agent.global.is_none()) {
+        if let Some(agent) = scope.agents().iter().find(|agent| agent.global.is_none()) {
             bail!("{label}: {} has no skill folder at global scope", agent.name);
         }
     }
-    Ok(Scope { label: label.to_string(), root, global, agents: scope_agents, plugins: entries("plugins")?, mcp: list("mcp")?, only })
+    Ok(scope)
 }
 
 fn strings(item: &Toml, name: &str) -> Result<Vec<String>> {
@@ -204,10 +208,10 @@ pub fn write(library: &Path, text: &str) -> Result<()> {
 /// Adds entries to the scope at `root`, or takes them out, and returns the
 /// new text. Comments stay. With no `only`, the change is for every agent
 /// of the scope: `plugins` gets the entry, or the entry goes out of every
-/// list. With `only`, the change is for those agents: an agent that the
-/// scope does not have goes into `harnesses`, and an entry that `plugins`
-/// has moves to the lists of the other agents. A project that the manifest
-/// does not have gets a table when an entry goes in.
+/// list. With `only`, the change is for those agents and their own lists
+/// only, and `harnesses` does not change. To take out an entry that
+/// `plugins` has, it moves to the lists of the other harnesses. A project
+/// that the manifest does not have gets a table when an entry goes in.
 pub fn edit(text: &str, home: &Path, root: &Path, entries: &[Entry], only: &[&'static Agent], add: bool) -> Result<String> {
     let manifest = parse(text, home)?;
     let scope = manifest.scopes.iter().find(|scope| scope.root == root);
@@ -219,7 +223,8 @@ pub fn edit(text: &str, home: &Path, root: &Path, entries: &[Entry], only: &[&'s
         (None, Ok(rest)) => format!("~/{}", rest.display()),
         (None, Err(_)) => root.display().to_string(),
     };
-    let mut scope_agents = scope.map(|scope| scope.agents.clone()).unwrap_or_else(agents::default);
+    let harnesses = scope.map(|scope| scope.harnesses.clone()).unwrap_or_else(agents::default);
+    let everyone = scope.map(Scope::agents).unwrap_or_else(agents::default);
 
     let mut document: DocumentMut = text.parse().with_context(|| format!("{FILE} is not valid TOML"))?;
     let table = if root == home {
@@ -231,7 +236,7 @@ pub fn edit(text: &str, home: &Path, root: &Path, entries: &[Entry], only: &[&'s
         projects.entry(&label).or_insert(toml_edit::table())
     };
     let table = table.as_table_mut().context("the scope is not a table")?;
-    let mut lists = Lists(table);
+    let mut lists = Lists { table, harnesses: &harnesses };
     for entry in entries {
         let text = entry.to_string();
         if add {
@@ -240,16 +245,7 @@ pub fn edit(text: &str, home: &Path, root: &Path, entries: &[Entry], only: &[&'s
                 continue;
             }
             for &agent in only {
-                if !scope_agents.contains(&agent) {
-                    if !lists.0.contains_key("harnesses") {
-                        for known in &scope_agents {
-                            lists.insert("harnesses", known.key())?;
-                        }
-                    }
-                    lists.insert("harnesses", agent.key())?;
-                    scope_agents.push(agent);
-                }
-                if !lists.has("plugins", &text) {
+                if !lists.gives(agent, &text) {
                     let key = lists.key_of(agent);
                     lists.insert(&key, &text)?;
                 }
@@ -257,7 +253,7 @@ pub fn edit(text: &str, home: &Path, root: &Path, entries: &[Entry], only: &[&'s
             continue;
         }
 
-        let targets: &[&'static Agent] = if only.is_empty() { &scope_agents } else { only };
+        let targets: &[&'static Agent] = if only.is_empty() { &everyone } else { only };
         let missing: Vec<&'static Agent> = targets.iter().copied().filter(|agent| !lists.gives(agent, &text)).collect();
         let blocked = if only.is_empty() { missing.len() == targets.len() } else { !missing.is_empty() };
         if blocked {
@@ -270,7 +266,7 @@ pub fn edit(text: &str, home: &Path, root: &Path, entries: &[Entry], only: &[&'s
             bail!("{label} does not give {entry} to {}", agent.name);
         }
         if only.is_empty() {
-            let keys: Vec<String> = lists.0.iter().map(|(key, _)| key.to_string()).filter(|key| key == "plugins" || agents::find(key).is_ok()).collect();
+            let keys: Vec<String> = lists.table.iter().map(|(key, _)| key.to_string()).filter(|key| key == "plugins" || agents::find(key).is_ok()).collect();
             for key in keys {
                 lists.delete(&key, &text);
             }
@@ -278,7 +274,7 @@ pub fn edit(text: &str, home: &Path, root: &Path, entries: &[Entry], only: &[&'s
         }
         if lists.has("plugins", &text) {
             lists.delete("plugins", &text);
-            for &other in scope_agents.iter().filter(|agent| !only.contains(agent)) {
+            for &other in harnesses.iter().filter(|agent| !only.contains(agent)) {
                 let key = lists.key_of(other);
                 lists.insert(&key, &text)?;
             }
@@ -292,39 +288,43 @@ pub fn edit(text: &str, home: &Path, root: &Path, entries: &[Entry], only: &[&'s
 }
 
 /// The lists of one scope table.
-struct Lists<'a>(&'a mut Table);
+struct Lists<'a> {
+    table: &'a mut Table,
+    /// The agents that `plugins` gives to.
+    harnesses: &'a [&'static Agent],
+}
 
 impl Lists<'_> {
     /// The key of `agent` in the table: the name or alias it has there, else its first alias or name.
     fn key_of(&self, agent: &Agent) -> String {
-        let present = self.0.iter().map(|(key, _)| key).find(|key| !SCOPE_KEYS.contains(key) && agents::find(key).is_ok_and(|found| found == agent));
+        let present = self.table.iter().map(|(key, _)| key).find(|key| !SCOPE_KEYS.contains(key) && agents::find(key).is_ok_and(|found| found == agent));
         present.unwrap_or(agent.key()).to_string()
     }
 
     /// True when the scope gives `text` to `agent`.
     fn gives(&self, agent: &Agent, text: &str) -> bool {
-        self.has("plugins", text) || self.has(&self.key_of(agent), text)
+        (self.harnesses.contains(&agent) && self.has("plugins", text)) || self.has(&self.key_of(agent), text)
     }
 
     fn has(&self, key: &str, text: &str) -> bool {
-        self.0.get(key).and_then(Toml::as_array).is_some_and(|list| list.iter().any(|value| value.as_str() == Some(text)))
+        self.table.get(key).and_then(Toml::as_array).is_some_and(|list| list.iter().any(|value| value.as_str() == Some(text)))
     }
 
     fn insert(&mut self, key: &str, text: &str) -> Result<()> {
         if self.has(key, text) {
             return Ok(());
         }
-        let list = self.0.entry(key).or_insert(toml_edit::value(toml_edit::Array::new()));
+        let list = self.table.entry(key).or_insert(toml_edit::value(toml_edit::Array::new()));
         list.as_array_mut().with_context(|| format!("`{key}` is not a list"))?.push(text);
         Ok(())
     }
 
     /// Takes `text` out of the list. An agent list that becomes empty goes away.
     fn delete(&mut self, key: &str, text: &str) {
-        if let Some(list) = self.0.get_mut(key).and_then(Toml::as_array_mut) {
+        if let Some(list) = self.table.get_mut(key).and_then(Toml::as_array_mut) {
             list.retain(|value| value.as_str() != Some(text));
             if list.is_empty() && !SCOPE_KEYS.contains(&key) {
-                self.0.remove(key);
+                self.table.remove(key);
             }
         }
     }
@@ -371,28 +371,30 @@ mod tests {
     }
 
     #[test]
-    fn an_edit_for_one_agent_adds_it_to_harnesses_and_splits_a_shared_entry() {
+    fn an_edit_for_one_agent_writes_only_its_own_list_and_splits_a_shared_entry() {
         let app = Path::new("/h/app");
         let text = "[project.\"~/app\"]\nplugins = [\"h00man\", \"pstack\"]\n";
 
-        // A new agent goes into `harnesses` next to the two default agents.
+        // An agent outside `harnesses` gets its own list, not `plugins`.
         let text = change(text, app, "matt/teach", &["cursor"], true).unwrap();
-        assert!(text.contains("harnesses = [\"claude\", \"codex\", \"cursor\"]"), "{text}");
-        assert_eq!(entries(&text, app, "cursor"), ["h00man", "pstack", "matt/teach"]);
+        assert!(!text.contains("harnesses"), "{text}");
+        assert_eq!(entries(&text, app, "cursor"), ["matt/teach"]);
         assert_eq!(entries(&text, app, "claude"), ["h00man", "pstack"]);
+        assert_eq!(change(&text, app, "matt/teach", &["cursor"], true).unwrap(), text, "a second install changed the text");
+        assert_eq!(change(&text, app, "pstack", &["codex"], true).unwrap(), text, "an entry that `plugins` gives went into a list");
 
-        // Out for one agent moves a shared entry to the lists of the others.
+        // Out for one agent moves a shared entry to the lists of the other harnesses.
         let text = change(&text, app, "pstack", &["claude"], false).unwrap();
         assert_eq!(entries(&text, app, "claude"), ["h00man"]);
         assert_eq!(entries(&text, app, "codex"), ["h00man", "pstack"]);
-        assert_eq!(entries(&text, app, "cursor"), ["h00man", "matt/teach", "pstack"]);
+        assert_eq!(entries(&text, app, "cursor"), ["matt/teach"]);
 
         // A skill of a whole plugin cannot go out alone.
         let error = change(&text, app, "h00man/plan", &[], false).unwrap_err().to_string();
         assert!(error.contains("whole plugin h00man"), "{error}");
         assert!(change(&text, app, "matt/teach", &["claude"], false).is_err());
-        let text = change(&text, app, "matt/teach", &[], false).unwrap();
-        assert_eq!(entries(&text, app, "cursor"), ["h00man", "pstack"]);
+        let text = change(&text, app, "matt/teach", &["cursor"], false).unwrap();
+        assert!(!text.contains("cursor"), "{text}");
     }
 
     #[test]
@@ -400,13 +402,16 @@ mod tests {
         let home = Path::new("/h");
         let text = "[project.\"~/app\"]\nharnesses = [\"claude\", \"cursor\", \"claude-code\"]\nclaude = [\"a\"]\nclaude-code = [\"b\"]\ncursor = [\"c\"]\n";
         let scope = &parse(text, home).unwrap().scopes[0];
-        assert_eq!(scope.agents.iter().map(|agent| agent.name.as_str()).collect::<Vec<_>>(), ["claude-code", "cursor"]);
+        assert_eq!(scope.harnesses.iter().map(|agent| agent.name.as_str()).collect::<Vec<_>>(), ["claude-code", "cursor"]);
         assert_eq!(scope.plugins_for(agents::find("claude").unwrap()), ["a", "b"]);
         assert_eq!(scope.plugins_for(agents::find("cursor").unwrap()), ["c"]);
 
         assert!(parse("[global]\nharnesses = [\"nope\"]\n", home).is_err());
         assert!(parse("[global]\nplugin = [\"typo\"]\n", home).is_err(), "an unknown key passed");
-        assert!(parse("[global]\ncursor = [\"a\"]\n", home).is_err(), "an agent outside `harnesses` got plugins");
+        let scope = &parse("[global]\nplugins = [\"p\"]\ncursor = [\"a\"]\n", home).unwrap().scopes[0];
+        assert_eq!(scope.plugins_for(agents::find("cursor").unwrap()), ["a"], "an agent outside `harnesses` got `plugins`");
+        assert_eq!(scope.agents().iter().map(|agent| agent.key()).collect::<Vec<_>>(), ["claude", "codex", "cursor"]);
+        assert!(parse("[global]\neve = [\"a\"]\n", home).is_err(), "an agent key without a global folder passed at global scope");
         assert!(parse("[global]\nharnesses = [\"eve\"]\n", home).is_err(), "an agent without a global folder passed at global scope");
         assert!(parse("[global]\nharnesses = [\"opencode\"]\n", home).is_ok());
     }

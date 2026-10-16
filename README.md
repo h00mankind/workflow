@@ -49,11 +49,11 @@ A source is one of two kinds. With `plugin = true`, its `path` is a complete plu
 
 ## Manifest and apply
 
-`manifest.toml` assigns plugins to `[global]` and to each `[project."<path>"]`. `plugins` is for every agent of the scope. A key with the name of an agent is for that agent only. `harnesses` names the agents of the scope. Without it, the agents are Claude Code and Codex.
+`manifest.toml` assigns plugins to `[global]` and to each `[project."<path>"]`. `harnesses` names the harnesses of the scope. Without it, the harnesses are Claude Code and Codex. `plugins` is for every harness. A key with the name of an agent is for that agent only, and the agent need not be a harness. Thus `cursor = ["h00man/plan"]` gives cursor that one skill and nothing from `plugins`.
 
 An entry is a plugin (`h00man`) or one skill of a plugin (`pstack/swarm`). An unknown plugin or skill is an error.
 
-A scope can also set `mcp = ["<name>", ...]`. Each name is a definition in `mcp/<name>.toml`. Claude Code and Codex receive those servers when the scope names that agent. The other agents skip them. An unknown server name is an error.
+A scope can also set `mcp = ["<name>", ...]`. Each name is a definition in `mcp/<name>.toml`. Claude Code and Codex receive those servers when they are harnesses of the scope. The other agents skip them. An unknown server name is an error.
 
 ```bash
 workflow-setup status                 # the drift between manifest.toml and the disk, for every scope
@@ -66,7 +66,7 @@ workflow-setup apply global --adopt   # also replace links that something else m
 
 ```bash
 workflow-setup install h00man/plan -a cursor -p ~/code/app --dry-run   # show what changes, change nothing
-workflow-setup install matt -g                    # give matt to every agent of the global scope
+workflow-setup install matt -g                    # give matt to every harness of the global scope
 workflow-setup remove matt -g -a codex            # take matt from Codex only
 workflow-setup list -g                            # each skill folder: made by workflow-setup or foreign
 workflow-setup remove --foreign find-skills -g    # unlink a foreign link, or move a foreign folder to ~/.Trash
@@ -74,7 +74,7 @@ workflow-setup remove --foreign find-skills -g    # unlink a foreign link, or mo
 
 For a foreign item, `list` shows its skills.sh source when the lock file has it: `~/.agents/.skill-lock.json` at global scope, `skills-lock.json` in a project. `remove` without `--foreign` takes only links that the engine owns.
 
-`-g` is the global scope and `-p` is a project. Without them, the scope is the project of `manifest.toml` that holds the current folder. `-a` names an agent, and you can give it more than one time. With `-a`, an agent that the scope does not have goes into `harnesses`, and then it also gets what `plugins` gives.
+`-g` is the global scope and `-p` is a project. Without them, the scope is the project of `manifest.toml` that holds the current folder. `-a` names an agent, and you can give it more than one time. With `-a`, `install` writes the entry in the list of that agent only, such as `cursor = ["h00man/plan"]`, and does not change `harnesses`. `remove` with `-a` takes the entry out of the list of that agent. When `plugins` has the entry, it moves to the lists of the other harnesses. Without `-a`, `remove` takes it out of `plugins` and out of every agent list.
 
 ## Agents
 

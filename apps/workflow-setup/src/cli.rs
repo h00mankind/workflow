@@ -257,13 +257,6 @@ fn change(env: &Env, args: &Args, names: &[&str], cwd: &Path, add: bool) -> Resu
     let entries = names.iter().map(|name| manifest::Entry::parse(name)).collect::<Result<Vec<_>>>()?;
     let (root, _) = args.scope(env, cwd)?;
     let text = manifest::edit(&manifest::read(&env.library), &env.home, &root, &entries, &args.agents, add)?;
-    let before = manifest::load(&env.library, &env.home)?.scopes.into_iter().find(|scope| scope.root == root);
-    let shared = before.as_ref().map(|scope| scope.plugins.iter().map(ToString::to_string).collect::<Vec<_>>().join(" ")).unwrap_or_default();
-    for agent in args.agents.iter().filter(|agent| add && !before.as_ref().is_some_and(|scope| scope.agents.contains(agent))) {
-        if !shared.is_empty() {
-            println!("note: {} goes into `harnesses`, so it also gets `plugins`: {shared}", agent.name);
-        }
-    }
     let mut plans = apply::plan_manifest(env, manifest::parse(&text, &env.home)?)?;
     let codex = plans.iter().any(|plan| plan.scope.root == root && plan.scope.has(Kind::CodexPlugin));
     plans.retain(|plan| plan.scope.root == root || plan.scope.global && codex);
@@ -498,10 +491,14 @@ mod tests {
         assert!(link.symlink_metadata().is_err(), "a dry run made a link");
 
         command(&env, "install pstack/swarm -g -a cursor").unwrap();
-        assert!(manifest_text().contains("harnesses = [\"claude\", \"codex\", \"cursor\"]"));
+        let installed = manifest_text();
+        assert_eq!(installed, before.replace("claude = [\"pstack\"]\n", "claude = [\"pstack\"]\ncursor = [\"pstack/swarm\"]\n"), "install did more than add the cursor list");
         assert_eq!(fs::read_link(&link).unwrap(), env.library.join("plugins/pstack/skills/swarm"));
-        // An agent in `harnesses` also gets what `plugins` gives every agent.
-        assert!(env.home.join(".cursor/skills/plan").symlink_metadata().is_ok());
+        let names: Vec<_> = fs::read_dir(env.home.join(".cursor/skills")).unwrap().flatten().map(|entry| entry.file_name()).collect();
+        assert_eq!(names, ["swarm"], "cursor got more than the one skill");
+        assert!(apply::plan_all(&env).unwrap().iter().all(Plan::in_sync));
+        command(&env, "install pstack/swarm -g -a cursor").unwrap();
+        assert_eq!(manifest_text(), installed, "a second install changed the manifest");
         assert!(apply::plan_all(&env).unwrap().iter().all(Plan::in_sync));
 
         command(&env, "remove pstack/swarm -g -a cursor").unwrap();

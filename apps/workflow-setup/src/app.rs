@@ -341,7 +341,7 @@ impl Manager {
                     key: plan.scope.root.to_string_lossy().into_owned(),
                     title: if plan.scope.global { "Global".to_string() } else { apply::tilde(&scan::home(), &plan.scope.root) },
                     description: if plan.in_sync() { "In sync with the manifest".to_string() } else { format!("{} to change", plan.changes.len()) },
-                    detail: plan.scope.agents.iter().map(|agent| agent.key()).collect::<Vec<_>>().join(" · "),
+                    detail: plan.scope.agents().iter().map(|agent| agent.key()).collect::<Vec<_>>().join(" · "),
                     warning: (!plan.in_sync()).then_some("drift"),
                 })
                 .collect(),

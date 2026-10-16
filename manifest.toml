@@ -3,8 +3,11 @@
 #
 # A scope is [global] (the home folder) or [project."<path>"]. In a scope:
 #   plugins    plugins for every harness of the scope
-#   claude     more plugins, for Claude Code only (also: codex, opencode)
+#   claude     more plugins, for Claude Code only (any agent name works)
 #   harnesses  the harnesses of the scope. Without it: claude and codex.
+#
+# Only a harness gets `plugins`. An agent key alone, such as
+# cursor = ["h00man/plan"], gives that agent those entries and nothing more.
 #
 # A plugin is a folder in plugins/. Its name is the prefix of its skills.
 

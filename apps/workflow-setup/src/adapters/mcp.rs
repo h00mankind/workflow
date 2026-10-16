@@ -26,8 +26,8 @@ pub struct Config {
 }
 
 pub fn configs(scope: &Scope) -> Vec<Config> {
-    let claude = scope.has(Kind::ClaudePlugin);
-    let codex = scope.has(Kind::CodexPlugin);
+    let has = |kind: Kind| scope.harnesses.iter().any(|agent| agent.kind == kind);
+    let (claude, codex) = (has(Kind::ClaudePlugin), has(Kind::CodexPlugin));
     let mut configs = vec![
         Config {
             file: scope.root.join(if scope.global { ".claude.json" } else { ".mcp.json" }),

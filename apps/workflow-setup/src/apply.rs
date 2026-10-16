@@ -219,10 +219,11 @@ fn doubles(library: &Path, scope: &Scope) -> Vec<Double> {
     let skills = library::skills(library);
     let dir_of = |agent: &Agent| agent.skill_dir(&scope.root, scope.global);
     let mut doubles: Vec<Double> = Vec::new();
-    for &reader in scope.agents.iter().filter(|agent| agent.kind != Kind::Skills) {
+    let everyone = scope.agents();
+    for &reader in everyone.iter().filter(|agent| agent.kind != Kind::Skills) {
         let Some(dir) = dir_of(reader) else { continue };
         let whole = scope.plugins_for(reader);
-        for &linker in scope.agents.iter().filter(|agent| agent.kind == Kind::Skills && dir_of(agent).as_ref() == Some(&dir)) {
+        for &linker in everyone.iter().filter(|agent| agent.kind == Kind::Skills && dir_of(agent).as_ref() == Some(&dir)) {
             for entry in scope.entries_for(linker).into_iter().filter(|entry| whole.iter().any(|plugin| plugin == entry.plugin())) {
                 let names: Vec<String> = match &entry {
                     Entry::Skill { skill, .. } => vec![skill.clone()],
@@ -267,7 +268,7 @@ fn desired_links(library: &Path, scope: &Scope) -> (BTreeMap<PathBuf, PathBuf>, 
     let order = library::plugins(library);
     let skills = library::skills(library);
     let mut wants: BTreeMap<PathBuf, Vec<Want>> = BTreeMap::new();
-    for &agent in &scope.agents {
+    for agent in scope.agents() {
         let Some(dir) = agent.skill_dir(&scope.root, scope.global) else { continue };
         for entry in scope.entries_for(agent) {
             let plugin = entry.plugin();
@@ -327,7 +328,7 @@ pub fn assigned(env: &Env, root: &Path) -> Result<BTreeSet<String>> {
         .scopes
         .iter()
         .filter(|scope| scope.root == root)
-        .flat_map(|scope| scope.agents.iter().flat_map(|agent| scope.plugins_for(agent)))
+        .flat_map(|scope| scope.agents().into_iter().flat_map(|agent| scope.plugins_for(agent)))
         .collect())
 }
 
@@ -389,7 +390,7 @@ pub fn plan_manifest(env: &Env, manifest: manifest::Manifest) -> Result<Vec<Plan
     }
     let servers = mcp::load(&env.library)?;
     for scope in &scopes {
-        for entry in scope.agents.iter().flat_map(|agent| scope.entries_for(agent)) {
+        for entry in scope.agents().into_iter().flat_map(|agent| scope.entries_for(agent)) {
             check_entry(&env.library, &entry).with_context(|| format!("{}: {}", scope.label, manifest::FILE))?;
         }
         for server in &scope.mcp {
