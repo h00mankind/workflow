@@ -4,6 +4,8 @@
 //!   workflow-setup help             lists the commands
 
 mod adapters;
+#[expect(dead_code, reason = "the plan uses the agent table from the next commit")]
+mod agents;
 mod app;
 mod apply;
 mod cli;
