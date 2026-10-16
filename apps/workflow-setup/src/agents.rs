@@ -1,12 +1,14 @@
 //! The agent table: every coding agent that reads skills, and where it reads
 //! them. The data is `agents.toml`, which `tools/agents-from-skills-sh.mjs`
-//! writes from the table of skills.sh.
+//! writes from the table of skills.sh and `agents.overrides.json`.
 //!
 //! The kind says how an agent receives a whole plugin. Claude Code loads a
 //! plugin from one link and gives its skills the prefix `<plugin>:`. Codex
 //! installs a plugin from this library as a marketplace. Every other agent
 //! gets one link per skill, with no prefix. A single skill is always one
-//! link, for every kind.
+//! link, for every kind. For a plugin kind, `project` and `global` are also
+//! the folders where the agent reads plain skills, so `plan` can warn when
+//! another agent links a skill there that the plugin agent already has.
 
 use std::{
     path::{Path, PathBuf},
@@ -122,7 +124,7 @@ mod tests {
         let opencode = find("opencode").unwrap();
         assert_eq!(opencode.kind, Kind::Skills);
         let home = Path::new("/h");
-        assert_eq!(opencode.skill_dir(Path::new("/p"), false).unwrap(), Path::new("/p/.agents/skills"));
+        assert_eq!(opencode.skill_dir(Path::new("/p"), false).unwrap(), Path::new("/p/.opencode/skills"), "the override for opencode is gone");
         assert_eq!(opencode.skill_dir(home, true).unwrap(), Path::new("/h/.config/opencode/skills"));
         assert_eq!(claude.skill_dir(home, true).unwrap(), Path::new("/h/.claude/skills"));
         for name in ["amp", "cline", "cursor", "droid", "gemini-cli", "github-copilot", "kilo", "kimi-code-cli", "pi", "warp", "zed"] {

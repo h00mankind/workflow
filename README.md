@@ -78,7 +78,7 @@ For a foreign item, `list` shows its skills.sh source when the lock file has it:
 
 ## Agents
 
-`apps/workflow-setup/agents.toml` is the agent table: each agent that reads skills, and its skill folder in a project and in the home folder. `tools/agents-from-skills-sh.mjs` writes it from the table of skills.sh. Do not edit it by hand. Run the script again when skills.sh changes. Each agent of the table works in `harnesses` and as a key of a scope.
+`apps/workflow-setup/agents.toml` is the agent table: each agent that reads skills, and its skill folder in a project and in the home folder. `tools/agents-from-skills-sh.mjs` writes it from the table of skills.sh and from `agents.overrides.json`. Do not edit `agents.toml` by hand. Put a change in the overrides file with a reason, and run the script again. Also run it when skills.sh changes. Each agent of the table works in `harnesses` and as a key of a scope.
 
 Each agent receives a plugin in one of three ways:
 
@@ -86,9 +86,11 @@ Each agent receives a plugin in one of three ways:
 - **Codex** installs from this library as the marketplace `workflow`, and keeps its own copy. `apply` copies a plugin again when its content changed, and sets `[plugins."<name>@workflow"]` in `~/.codex/config.toml` and in each project's `.codex/config.toml`. A plugin is off at global scope unless `[global]` assigns it.
 - **Every other agent**, opencode too, gets one link per skill in its skill folder, with no prefix. Many agents read the same folder, such as `.agents/skills/`. Each path gets one link. Where two plugins want the same path, `h00man` wins, then the order in `sources.toml`, and `status` reports the clash.
 
+Codex also reads `.agents/skills/`. When Codex has a whole plugin and another agent, such as cursor, links a skill of that plugin into `.agents/skills/`, Codex gets the skill two times, as `h00man:plan` and as `plan`. `status` shows a warning for each such plugin. The links stay. For this reason opencode uses `.opencode/skills/`, which it also reads.
+
 One skill (`<plugin>/<skill>`) is one link without a prefix, for every agent, Claude Code and Codex too.
 
-Before the agent table, opencode got its links in `.opencode/skill/`. `apply` removes those owned links and makes them again in `.agents/skills/`.
+Before the agent table, opencode got its links in `.opencode/skill/`. `apply` removes those owned links and makes them again in `.opencode/skills/`.
 
 MCP servers go to the config of each agent:
 

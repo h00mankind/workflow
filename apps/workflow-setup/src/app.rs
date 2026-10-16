@@ -1073,6 +1073,13 @@ impl Manager {
                 clash.winner
             )));
         }
+        for double in &plan.doubles {
+            let dir = match plan.scope.global {
+                true => apply::tilde(&home, &double.dir),
+                false => double.dir.strip_prefix(&plan.scope.root).unwrap_or(&double.dir).display().to_string(),
+            };
+            pane = pane.child(Callout::new(Severity::Warning).title(format!("{} gets skills twice", double.reader)).child(double.message(&dir)));
+        }
         for (label, names) in plan.groups(&home) {
             pane = pane.child(
                 div()

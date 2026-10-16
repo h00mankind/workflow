@@ -21,7 +21,7 @@ use toml_edit::DocumentMut;
 
 use crate::{
     adapters::mcp::Format as McpFormat,
-    agents::{self, Kind},
+    agents::{self, Agent, Kind},
     library,
     manifest::{self, Entry, Scope},
     mcp,
@@ -109,6 +109,8 @@ pub struct Plan {
     /// Link paths that two assigned plugins want with different targets.
     /// The first plugin in the library's order wins.
     pub clashes: Vec<Clash>,
+    /// Skills that a plugin agent of the scope gets twice.
+    pub doubles: Vec<Double>,
     /// Every link the manifest assigns in this scope, with its target.
     links: BTreeMap<PathBuf, PathBuf>,
     /// True when the manifest assigns something here that is not a link.
@@ -180,6 +182,73 @@ pub struct Clash {
     pub path: PathBuf,
     pub winner: String,
     pub losers: Vec<String>,
+}
+
+/// A Skills agent links the skills of a plugin into a folder that a plugin
+/// agent also reads, and the plugin agent has that plugin whole. The plugin
+/// agent sees each skill twice: `<plugin>:<skill>` and `<skill>`.
+#[derive(Debug, PartialEq, Eq)]
+pub struct Double {
+    /// The plugin agent, by its manifest key.
+    pub reader: &'static str,
+    /// The Skills agents that make the links, by their manifest keys.
+    pub linkers: Vec<&'static str>,
+    pub dir: PathBuf,
+    pub plugin: String,
+    pub skills: Vec<String>,
+}
+
+impl Double {
+    /// The warning for `status`. `dir` is the folder as the user reads it.
+    pub fn message(&self, dir: &str) -> String {
+        let (reader, plugin, linkers) = (self.reader, &self.plugin, self.linkers.join(" and "));
+        match self.skills.as_slice() {
+            [skill] => format!("{reader} also reads {dir}, so it gets {skill} twice: {plugin}:{skill} and {skill}. {linkers} links it there."),
+            skills => format!(
+                "{reader} also reads {dir}, so it gets {} skills of {plugin} twice, as {plugin}:<skill> and <skill>. {linkers} links them there: {}.",
+                skills.len(),
+                skills.join(" ")
+            ),
+        }
+    }
+}
+
+/// The doubles of a scope. The `project` and `global` folders of a plugin
+/// agent in the agent table are the folders where it reads plain skills.
+fn doubles(library: &Path, scope: &Scope) -> Vec<Double> {
+    let skills = library::skills(library);
+    let dir_of = |agent: &Agent| agent.skill_dir(&scope.root, scope.global);
+    let mut doubles: Vec<Double> = Vec::new();
+    for &reader in scope.agents.iter().filter(|agent| agent.kind != Kind::Skills) {
+        let Some(dir) = dir_of(reader) else { continue };
+        let whole = scope.plugins_for(reader);
+        for &linker in scope.agents.iter().filter(|agent| agent.kind == Kind::Skills && dir_of(agent).as_ref() == Some(&dir)) {
+            for entry in scope.entries_for(linker).into_iter().filter(|entry| whole.iter().any(|plugin| plugin == entry.plugin())) {
+                let names: Vec<String> = match &entry {
+                    Entry::Skill { skill, .. } => vec![skill.clone()],
+                    Entry::Plugin(plugin) => skills.iter().filter(|skill| skill.origin == *plugin).map(|skill| skill.name.clone()).collect(),
+                };
+                let at = match doubles.iter().position(|double| double.reader == reader.key() && double.plugin == entry.plugin()) {
+                    Some(at) => at,
+                    None => {
+                        let double = Double { reader: reader.key(), linkers: Vec::new(), dir: dir.clone(), plugin: entry.plugin().to_string(), skills: Vec::new() };
+                        doubles.push(double);
+                        doubles.len() - 1
+                    }
+                };
+                let double = &mut doubles[at];
+                if !double.linkers.contains(&linker.key()) {
+                    double.linkers.push(linker.key());
+                }
+                for name in names {
+                    if !double.skills.contains(&name) {
+                        double.skills.push(name);
+                    }
+                }
+            }
+        }
+    }
+    doubles
 }
 
 /// One link that the manifest wants, before clashes are resolved.
@@ -476,7 +545,7 @@ fn plan(env: &Env, record: &Record, scope: &Scope, codex_plugins: &BTreeSet<Stri
         }
     }
 
-    Ok(Plan { scope: scope.clone(), changes, clashes, links, keeps_record: !assigned.is_empty() })
+    Ok(Plan { scope: scope.clone(), changes, clashes, doubles: doubles(&env.library, scope), links, keeps_record: !assigned.is_empty() })
 }
 
 /// What `apply` did in one scope.
@@ -807,9 +876,9 @@ harnesses = ["claude", "codex", "opencode"]
         assert_eq!(target(&env, ".claude/skills/h00man"), "plugins/h00man");
         assert_eq!(target(&env, ".claude/skills/pstack"), "plugins/pstack");
         assert_eq!(target(&env, "app/.claude/skills/pstack"), "plugins/pstack");
-        // opencode gets one link per skill in .agents/skills, and the first plugin wins a name.
-        assert_eq!(target(&env, "app/.agents/skills/unslop"), "plugins/h00man/skills/unslop");
-        assert_eq!(target(&env, "app/.agents/skills/swarm"), "plugins/pstack/skills/swarm");
+        // opencode gets one link per skill in .opencode/skills, and the first plugin wins a name.
+        assert_eq!(target(&env, "app/.opencode/skills/unslop"), "plugins/h00man/skills/unslop");
+        assert_eq!(target(&env, "app/.opencode/skills/swarm"), "plugins/pstack/skills/swarm");
         assert_eq!(plan_all(&env).unwrap()[1].clashes.len(), 1);
         // Codex has both plugins. pstack is on for the project only.
         assert!(env.home.join(".codex/plugins/cache/workflow/pstack").is_dir());
@@ -924,15 +993,16 @@ harnesses = ["claude", "codex", "opencode"]
         assert_eq!(removes, 2);
         run(&env, false);
         assert_eq!(fs::read_dir(&old).unwrap().count(), 0, "an old opencode link stayed");
-        assert_eq!(target(&env, "app/.agents/skills/plan"), "plugins/h00man/skills/plan");
-        assert_eq!(target(&env, "app/.agents/skills/swarm"), "plugins/pstack/skills/swarm");
+        assert_eq!(target(&env, "app/.opencode/skills/plan"), "plugins/h00man/skills/plan");
+        assert_eq!(target(&env, "app/.opencode/skills/swarm"), "plugins/pstack/skills/swarm");
+        assert!(!env.home.join("app/.agents").exists(), "Codex reads .agents/skills and would get each skill twice");
         assert!(in_sync(&env));
     }
 
     #[test]
     fn agents_that_share_a_folder_share_one_link_and_a_clash_is_reported_once() {
         let env = fixture("shared");
-        fs::write(env.library.join(manifest::FILE), "[project.\"~/app\"]\nplugins = [\"pstack\", \"h00man\"]\nharnesses = [\"opencode\", \"cursor\", \"amp\", \"zed\"]\n").unwrap();
+        fs::write(env.library.join(manifest::FILE), "[project.\"~/app\"]\nplugins = [\"pstack\", \"h00man\"]\nharnesses = [\"cline\", \"cursor\", \"amp\", \"zed\"]\n").unwrap();
         let plan = &plan_all(&env).unwrap()[1];
         let dir = env.home.join("app/.agents/skills");
         let mut linked: Vec<_> = plan.changes.iter().filter_map(|change| match change {
@@ -945,6 +1015,24 @@ harnesses = ["claude", "codex", "opencode"]
         run(&env, false);
         assert_eq!(target(&env, "app/.agents/skills/unslop"), "plugins/h00man/skills/unslop", "the clash took the wrong winner");
         assert!(in_sync(&env));
+    }
+
+    #[test]
+    fn a_skills_agent_that_links_into_a_folder_codex_reads_is_a_warning() {
+        let env = fixture("doubles");
+        fs::write(env.library.join(manifest::FILE), "[project.\"~/app\"]\nplugins = [\"h00man\"]\nharnesses = [\"codex\", \"cursor\"]\n").unwrap();
+        let plan = &plan_all(&env).unwrap()[1];
+        let dir = env.home.join("app/.agents/skills");
+        let double = Double { reader: "codex", linkers: vec!["cursor"], dir: dir.clone(), plugin: "h00man".into(), skills: vec!["plan".into(), "unslop".into()] };
+        assert_eq!(plan.doubles, [double]);
+        assert!(plan.changes.contains(&Change::Link { path: dir.join("plan"), target: env.library.join("plugins/h00man/skills/plan") }), "the warning dropped a link");
+
+        fs::write(env.library.join(manifest::FILE), "[project.\"~/app\"]\ncodex = [\"h00man\"]\ncursor = [\"h00man/plan\"]\nharnesses = [\"codex\", \"cursor\"]\n").unwrap();
+        let message = plan_all(&env).unwrap()[1].doubles.iter().map(|double| double.message(".agents/skills")).collect::<Vec<_>>();
+        assert_eq!(message, ["codex also reads .agents/skills, so it gets plan twice: h00man:plan and plan. cursor links it there."]);
+
+        fs::write(env.library.join(manifest::FILE), "[project.\"~/app\"]\nplugins = [\"h00man\"]\nharnesses = [\"codex\", \"opencode\"]\n").unwrap();
+        assert!(plan_all(&env).unwrap()[1].doubles.is_empty());
     }
 
     #[test]
@@ -975,7 +1063,9 @@ harnesses = ["claude", "codex", "opencode"]
         fs::write(dir.join("SKILL.md"), "teach").unwrap();
         fs::write(env.library.join(manifest::FILE), include_str!("../../../manifest.toml")).unwrap();
         run(&env, false);
-        assert_eq!(target(&env, "Documents/h00man.code/workflow/.agents/skills/teach"), "plugins/matt/skills/teach");
+        assert_eq!(target(&env, "Documents/h00man.code/workflow/.opencode/skills/teach"), "plugins/matt/skills/teach");
+        assert!(!env.home.join("Documents/h00man.code/workflow/.agents").exists());
+        assert!(plan_all(&env).unwrap().iter().all(|plan| plan.doubles.is_empty()));
         assert_eq!(target(&env, ".claude/skills/pstack"), "plugins/pstack");
         assert!(in_sync(&env));
     }

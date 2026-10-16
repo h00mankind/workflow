@@ -101,8 +101,9 @@ mod tests {
         assert!(!item("find-skills").owned && item("find-skills").link.is_none());
         assert_eq!(item("find-skills").source.as_deref(), Some("vercel-labs/skills"));
         assert!(!item("grill").owned && item("grill").source.is_none() && item("grill").broken);
-        assert!(!item("plan").broken);
-        assert!(item("swarm").owned && item("plan").owned);
+
+        let opencode = all.iter().find(|folder| folder.dir == app.join(".opencode/skills")).expect("the opencode folder is missing");
+        assert!(opencode.items.iter().all(|item| item.owned && !item.broken) && opencode.items.len() == 3);
 
         let claude = all.iter().find(|folder| folder.dir == app.join(".claude/skills")).unwrap();
         let names: Vec<(&str, bool)> = claude.items.iter().map(|item| (item.name.as_str(), item.owned)).collect();

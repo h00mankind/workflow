@@ -321,6 +321,9 @@ fn print_plan(env: &Env, plan: &Plan) {
     for clash in &plan.clashes {
         println!("{title}: {} is in {} and {}. {} wins.", tilde(env, &clash.path), clash.winner, clash.losers.join(", "), clash.winner);
     }
+    for double in &plan.doubles {
+        println!("{title}: warning: {}", double.message(&place(env, plan, &double.dir)));
+    }
     if plan.in_sync() {
         println!("{title}: in sync");
         return;
@@ -328,6 +331,14 @@ fn print_plan(env: &Env, plan: &Plan) {
     println!("{title}: {} to change", plan.changes.len());
     for (label, names) in plan.groups(&env.home) {
         println!("  {label}\n    {} ({})", names.join(" "), names.len());
+    }
+}
+
+/// A folder of a scope as the user reads it: from the project root, or from `~`.
+fn place(env: &Env, plan: &Plan, dir: &Path) -> String {
+    match plan.scope.global {
+        true => tilde(env, dir),
+        false => dir.strip_prefix(&plan.scope.root).unwrap_or(dir).display().to_string(),
     }
 }
 
