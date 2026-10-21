@@ -125,7 +125,7 @@ From idea to shipped, each step a skill:
 - `plugins/h00man/skills/copywriting/` — Product copywriting: website copy, UI microcopy, error messages, empty states.
 - `plugins/h00man/skills/caveman/` — Ultra-compressed response mode: full technical accuracy, ~75% fewer tokens.
 - `plugins/h00man/skills/benchmark/` — Benchmark models head-to-head or eval skills (with-skill vs bare baseline) via parallel sub-agents and a blind judge. HTML report in `benchmarks/` (gitignored) showing the work first, stats after. Quick mode by default; `deep` for more tasks and contenders.
-- `plugins/h00man/skills/prompt/` — Generate prompts in `quick` mode for copyable one-offs or `structured` mode for Markdown records in `docs/prompts/`; default `text` mode writes a clean, structured LLM/agent prompt, while media modes `image`, `video`, `audio` cover MidJourney / Seedance / ElevenLabs. Use `plugins/h00man/skills/html/` for visual artifacts.
+- `plugins/h00man/skills/prompt/` — Generate prompts with router-first discipline for text, image (creation vs edit with ChatGPT 2.5 default), video, and audio; quick mode for copyable one-offs or structured records in `docs/prompts/`. Deep model and provider routing in `reference.md`.
 
 ## Credits
 
