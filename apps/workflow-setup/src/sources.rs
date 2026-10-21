@@ -302,6 +302,68 @@ pub fn write_source(library: &Path, source: &Source) -> Result<()> {
     fs::write(&path, document.to_string()).with_context(|| format!("cannot write {}", path.display()))
 }
 
+/// Writes the repository, the branch, and the skills of the source `name`.
+/// A branch of None follows the default branch. Skills of None copy every
+/// skill. The pin stays, so the next diff shows what the change brings.
+pub fn set_fields(library: &Path, name: &str, repository: &str, branch: Option<&str>, skills: Option<&[String]>) -> Result<()> {
+    let path = library.join(FILE);
+    let text = fs::read_to_string(&path).with_context(|| format!("cannot read {}", path.display()))?;
+    let mut document: DocumentMut = text.parse().with_context(|| format!("{FILE} is not valid TOML"))?;
+    let table = document.get_mut(name).and_then(toml_edit::Item::as_table_mut).with_context(|| format!("{FILE} has no source named {name}"))?;
+    table["repository"] = toml_edit::value(repository);
+    match branch {
+        Some(branch) => table["branch"] = toml_edit::value(branch),
+        None => drop(table.remove("branch")),
+    }
+    match skills {
+        Some(skills) => table["skills"] = toml_edit::value(skills.iter().collect::<toml_edit::Array>()),
+        None => drop(table.remove("skills")),
+    }
+    fs::write(&path, document.to_string()).with_context(|| format!("cannot write {}", path.display()))
+}
+
+/// Takes the source out of `sources.toml` and deletes its cache. The library
+/// copy in `plugins/<name>/` moves to the Trash of `home`.
+pub fn remove(library: &Path, name: &str, home: &Path) -> Result<()> {
+    let path = library.join(FILE);
+    let text = fs::read_to_string(&path).with_context(|| format!("cannot read {}", path.display()))?;
+    let mut document: DocumentMut = text.parse().with_context(|| format!("{FILE} is not valid TOML"))?;
+    let source = parse(&text)?.into_iter().find(|source| source.name == name).with_context(|| format!("{FILE} has no source named {name}"))?;
+    document.remove(name);
+    fs::write(&path, document.to_string()).with_context(|| format!("cannot write {}", path.display()))?;
+    let copy = plugins::dir(library, name);
+    if copy.exists() {
+        crate::ops::remove(&copy, home)?;
+    }
+    remove_dir(&cache_repo(library, &source))?;
+    for stage in ["next", "pinned", "previous", "empty"] {
+        remove_dir(&stage_dir(library, &source, stage))?;
+    }
+    plugins::sync(library)
+}
+
+/// Every skill of the fetched commit under the source's path, whatever
+/// `skills` names.
+pub fn available(library: &Path, source: &Source) -> Result<Vec<String>> {
+    let cache = cache_repo(library, source);
+    let commit = fetched(&cache, source)?;
+    let mut args = vec!["ls-tree", "-r", "-z", "--name-only", &commit, "--"];
+    if !source.path.is_empty() {
+        args.push(&source.path);
+    }
+    let listing = git(&cache, &args)?;
+    let mut names: Vec<String> = listing
+        .split('\0')
+        .filter_map(|path| path.strip_suffix("/SKILL.md"))
+        .filter_map(|dir| dir.rsplit('/').next())
+        .filter(|name| is_plain_name(name))
+        .map(str::to_string)
+        .collect();
+    names.sort();
+    names.dedup();
+    Ok(names)
+}
+
 // ---------- cache ----------
 
 fn cache_repo(library: &Path, source: &Source) -> PathBuf {

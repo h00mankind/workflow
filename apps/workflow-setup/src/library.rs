@@ -33,11 +33,6 @@ pub struct Collision {
     pub losers: Vec<String>,
 }
 
-/// True when `dir` can serve as a library.
-pub fn is_library(dir: &Path) -> bool {
-    dir.join(sources::FILE).is_file() || !skills(dir).is_empty()
-}
-
 /// Origins in order of precedence: `h00man`, then the sources in the order
 /// `sources.toml` gives them, then any other folder by name.
 pub fn origins(library: &Path, category: &str) -> Vec<String> {

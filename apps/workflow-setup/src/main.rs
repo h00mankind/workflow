@@ -23,7 +23,7 @@ use std::path::PathBuf;
 use ely_gpui_component::Assets;
 use gpui::{App, AppContext, Bounds, KeyBinding, TitlebarOptions, WindowBounds, WindowOptions, px, size};
 
-use app::{ChooseLibrary, Manager, OpenProject, Quit, Rescan, Save};
+use app::{ChooseLibrary, Manager, OpenProject, Quit, Rescan};
 
 fn main() {
     let args: Vec<String> = std::env::args().skip(1).collect();
@@ -37,8 +37,8 @@ fn main() {
     let project = args.first().map(PathBuf::from);
     gpui_platform::application().with_assets(Assets).run(move |cx: &mut App| {
         ely_gpui_component::init(cx);
+        app::install_theme(cx);
         cx.bind_keys([
-            KeyBinding::new("cmd-s", Save, None),
             KeyBinding::new("cmd-o", OpenProject, None),
             KeyBinding::new("cmd-shift-l", ChooseLibrary, None),
             KeyBinding::new("cmd-r", Rescan, None),

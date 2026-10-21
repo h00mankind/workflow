@@ -122,11 +122,6 @@ impl Plan {
         self.changes.is_empty()
     }
 
-    /// True when a link that something else made is in the way.
-    pub fn can_adopt(&self) -> bool {
-        self.changes.iter().any(|change| matches!(change, Change::Conflict { foreign_link: Some(_), .. }))
-    }
-
     /// The changes for display: one group per kind of change and place,
     /// with the names it holds.
     pub fn groups(&self, home: &Path) -> Vec<(String, Vec<String>)> {
@@ -318,18 +313,6 @@ pub fn tilde(home: &Path, path: &Path) -> String {
         Ok(rest) => format!("~/{}", rest.display()),
         Err(_) => path.display().to_string(),
     }
-}
-
-/// The plugins that the manifest assigns to the scope at `root`, for one
-/// agent or more.
-pub fn assigned(env: &Env, root: &Path) -> Result<BTreeSet<String>> {
-    let manifest = manifest::load(&env.library, &env.home)?;
-    Ok(manifest
-        .scopes
-        .iter()
-        .filter(|scope| scope.root == root)
-        .flat_map(|scope| scope.agents().into_iter().flat_map(|agent| scope.plugins_for(agent)))
-        .collect())
 }
 
 #[derive(Default, Serialize, Deserialize)]
@@ -555,6 +538,17 @@ pub struct Applied {
     pub written: usize,
     pub removed: usize,
     pub left: usize,
+}
+
+/// Takes the source `name` out of every scope of the manifest and makes
+/// the disk match, then takes it out of `sources.toml`. Its copy goes to the Trash.
+pub fn remove_source(env: &Env, name: &str) -> Result<Vec<Applied>> {
+    let text = manifest::drop_plugin(&manifest::read(&env.library), &env.home, name)?;
+    let plans = plan_manifest(env, manifest::parse(&text, &env.home)?)?;
+    manifest::write(&env.library, &text)?;
+    let (applied, _) = apply(env, &plans, false)?;
+    crate::sources::remove(&env.library, name, &env.home)?;
+    Ok(applied)
 }
 
 /// Makes the disk match the plans. With `adopt`, a link that something else
@@ -1059,10 +1053,15 @@ harnesses = ["claude", "codex", "opencode"]
     #[test]
     fn the_repo_manifest_parses_and_is_in_sync_after_one_apply() {
         let env = fixture("repo-manifest");
-        let dir = env.library.join("plugins/matt/skills/teach");
-        fs::create_dir_all(&dir).unwrap();
-        fs::write(dir.join("SKILL.md"), "teach").unwrap();
-        fs::write(env.library.join(manifest::FILE), include_str!("../../../manifest.toml")).unwrap();
+        let text = include_str!("../../../manifest.toml");
+        // Every single skill that the manifest names, as "plugin/skill".
+        let singles = text.split('"').skip(1).step_by(2).filter_map(|value| value.split_once('/')).filter(|(plugin, _)| !plugin.starts_with('~'));
+        for (plugin, skill) in singles.chain([("matt", "teach")]) {
+            let dir = env.library.join("plugins").join(plugin).join("skills").join(skill);
+            fs::create_dir_all(&dir).unwrap();
+            fs::write(dir.join("SKILL.md"), skill).unwrap();
+        }
+        fs::write(env.library.join(manifest::FILE), text).unwrap();
         run(&env, false);
         assert_eq!(target(&env, "Documents/h00man.code/workflow/.opencode/skills/teach"), "plugins/matt/skills/teach");
         assert!(!env.home.join("Documents/h00man.code/workflow/.agents").exists());

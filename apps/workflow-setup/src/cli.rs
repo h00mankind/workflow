@@ -41,6 +41,14 @@ workflow-setup sources fetch [name]    get the newest commit of each source into
 workflow-setup sources diff [name]     show what the fetched commit would change (--stat: no patch)
 workflow-setup sources accept <name>   write the copy of the commit that the last diff showed, and
                                        move the pin (--all: every source)
+workflow-setup sources skills [name]   fetch each source and list every skill it has. * marks
+                                       the skills the library copies.
+workflow-setup sources edit <name> [--repo spec] [--branch branch | --default-branch]
+                                       [-s skill]... [--all-skills]
+                                       change the source in sources.toml, then fetch it and show
+                                       the diff. --yes: accept the copy.
+workflow-setup sources remove <name>   take the source out of every scope of manifest.toml and
+                                       apply, then out of sources.toml. Its copy goes to ~/.Trash.
 
 For status and apply, a scope is `global` or a project path from manifest.toml.
 Without one: every scope.
@@ -62,6 +70,8 @@ struct Args<'a> {
     agents: Vec<&'static Agent>,
     skills: Vec<&'a str>,
     name: Option<&'a str>,
+    repo: Option<&'a str>,
+    branch: Option<&'a str>,
 }
 
 impl<'a> Args<'a> {
@@ -76,6 +86,8 @@ impl<'a> Args<'a> {
                 "-a" | "--agent" => parsed.agents.push(agents::find(value()?)?),
                 "-s" | "--skill" => parsed.skills.push(value()?),
                 "--name" => parsed.name = Some(value()?),
+                "--repo" => parsed.repo = Some(value()?),
+                "--branch" => parsed.branch = Some(value()?),
                 "-h" | "--help" => parsed.words.push("help"),
                 flag if flag.starts_with("--") => parsed.flags.push(flag),
                 flag if flag.starts_with('-') => bail!("`{flag}` is not an option. Run workflow-setup help."),
@@ -142,6 +154,22 @@ pub fn run(args: &[String]) -> Result<()> {
             println!("{}: plugins/{} is now the copy at {}", source.name, source.name, short(&commit));
             Ok(())
         }),
+        ["sources", "skills", names @ ..] => each(names, false, |library, source| {
+            sources::fetch(library, source)?;
+            let all = sources::available(library, source)?;
+            let chosen = |skill: &String| source.plugin || source.skills.as_ref().is_none_or(|skills| skills.contains(skill));
+            let marked: Vec<String> = all.iter().map(|skill| if chosen(skill) { format!("*{skill}") } else { skill.clone() }).collect();
+            println!("{} ({} of {}): {}", source.name, all.iter().filter(|skill| chosen(skill)).count(), all.len(), marked.join(" "));
+            Ok(())
+        }),
+        ["sources", "edit", name] => edit_source(&find_library()?, &args, name),
+        ["sources", "remove", name] => {
+            let env = Env::new(find_library()?);
+            let applied = apply::remove_source(&env, name)?;
+            let (written, removed) = applied.iter().fold((0, 0), |sum, one| (sum.0 + one.written, sum.1 + one.removed));
+            println!("{name}: out of {} and {} ({written} written, {removed} removed). The copy is in the Trash.", manifest::FILE, sources::FILE);
+            Ok(())
+        }
         _ => {
             println!("{USAGE}");
             Ok(())
@@ -162,6 +190,27 @@ fn add(library: &Path, args: &Args, spec: &str) -> Result<()> {
     sources::write_source(library, &source)?;
     println!("{}: [{}] from {}", sources::FILE, source.name, source.repository);
     let source = sources::load(library)?.into_iter().find(|known| known.name == source.name).context("the new source is missing")?;
+    review(library, &source, args.flag("--yes"))
+}
+
+/// `sources edit`: writes the given fields, keeps the others, then reviews the source.
+fn edit_source(library: &Path, args: &Args, name: &str) -> Result<()> {
+    let source = sources::load(library)?.into_iter().find(|source| source.name == name).with_context(|| format!("{} has no source named {name}", sources::FILE))?;
+    let repository = match args.repo {
+        Some(spec) => sources::new_source(spec, Some(name), &[], &crate::scan::home())?.repository,
+        None => source.repository.clone(),
+    };
+    let branch = if args.flag("--default-branch") { None } else { args.branch.map(str::to_string).or(source.branch.clone()) };
+    let skills: Option<Vec<String>> = if args.flag("--all-skills") {
+        None
+    } else if args.skills.is_empty() {
+        source.skills.clone()
+    } else {
+        Some(args.skills.iter().map(|skill| skill.to_string()).collect())
+    };
+    sources::set_fields(library, name, &repository, branch.as_deref(), skills.as_deref())?;
+    println!("{}: [{name}] written", sources::FILE);
+    let source = sources::load(library)?.into_iter().find(|source| source.name == name).context("the source is missing")?;
     review(library, &source, args.flag("--yes"))
 }
 

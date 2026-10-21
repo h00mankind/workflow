@@ -205,6 +205,20 @@ pub fn write(library: &Path, text: &str) -> Result<()> {
     fs::write(&path, text).with_context(|| format!("cannot write {}", path.display()))
 }
 
+/// Takes every entry of `plugin` out of every scope, and returns the new text.
+pub fn drop_plugin(text: &str, home: &Path, plugin: &str) -> Result<String> {
+    let mut text = text.to_string();
+    for scope in parse(&text, home)?.scopes {
+        let mut entries: Vec<Entry> = scope.plugins.iter().chain(scope.only.values().flatten()).filter(|entry| entry.plugin() == plugin).cloned().collect();
+        entries.sort();
+        entries.dedup();
+        for entry in entries {
+            text = edit(&text, home, &scope.root, &[entry], &[], false)?;
+        }
+    }
+    Ok(text)
+}
+
 /// Adds entries to the scope at `root`, or takes them out, and returns the
 /// new text. Comments stay. With no `only`, the change is for every agent
 /// of the scope: `plugins` gets the entry, or the entry goes out of every
