@@ -1,0 +1,6 @@
+{
+  "name": "matt",
+  "version": "0.0.0",
+  "description": "Skills from https://github.com/mattpocock/skills, pinned in sources.toml.",
+  "skills": "./skills/"
+}

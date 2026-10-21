@@ -2,15 +2,23 @@
 /*
 
 # ...except these
-!/skills/
+!/plugins/
 !/agents/
+!/mcp/
 !/scripts/
+!/instructions/
+!/apps/
+!/.agents/
+/.agents/*
+!/.agents/plugins/
+!/sources.toml
+!/manifest.toml
 !/.gitignore
 !/LICENSE
 !/README.md
 
 .DS_Store
-skills/.DS_Store
+target/
 
 __pycache__/
 *.pyc

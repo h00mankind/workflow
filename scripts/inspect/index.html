@@ -1,0 +1,591 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>inspect</title>
+<style>
+  /* Direction: a parts manifest for an agent setup. Dense, monospace-led,
+     warm paper neutrals, one teal accent, hairline borders, no shadows. */
+  :root {
+    color-scheme: light dark;
+
+    --s1: 4px; --s2: 8px; --s3: 12px; --s4: 16px; --s5: 24px; --s6: 32px;
+
+    --t-xs: 0.6875rem; --t-sm: 0.8125rem; --t-md: 0.875rem; --t-lg: 1.0625rem; --t-xl: 1.375rem;
+    --mono: ui-monospace, "SF Mono", "JetBrains Mono", Menlo, Consolas, monospace;
+    --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+
+    --radius: 3px;
+    --line: 1px;
+    --tap: 44px;
+    --fast: 120ms;
+
+    --bg: oklch(0.975 0.006 85);
+    --surface: oklch(0.995 0.004 85);
+    --sunken: oklch(0.95 0.008 85);
+    --border: oklch(0.87 0.01 85);
+    --text: oklch(0.24 0.015 80);
+    --muted: oklch(0.47 0.015 80);
+    --accent: oklch(0.47 0.085 195);
+    --accent-soft: oklch(0.93 0.03 195);
+    --on-accent: oklch(0.985 0.005 195);
+    --warn: oklch(0.5 0.12 60);
+    --warn-soft: oklch(0.94 0.045 80);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: oklch(0.19 0.008 80);
+      --surface: oklch(0.225 0.008 80);
+      --sunken: oklch(0.165 0.008 80);
+      --border: oklch(0.33 0.01 80);
+      --text: oklch(0.92 0.01 85);
+      --muted: oklch(0.7 0.012 85);
+      --accent: oklch(0.78 0.09 195);
+      --accent-soft: oklch(0.3 0.04 195);
+      --on-accent: oklch(0.18 0.02 195);
+      --warn: oklch(0.82 0.11 75);
+      --warn-soft: oklch(0.31 0.045 70);
+    }
+  }
+
+  *, *::before, *::after { box-sizing: border-box; }
+  [hidden] { display: none !important; }
+  html { -webkit-text-size-adjust: 100%; }
+  body {
+    margin: 0;
+    height: 100dvh;
+    display: grid;
+    grid-template-rows: auto auto minmax(0, 1fr);
+    background: var(--bg);
+    color: var(--text);
+    font: var(--t-md)/1.5 var(--sans);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+  ::selection { background: var(--accent-soft); }
+  :focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+  h1, h2, h3, p, ul, dl, dd { margin: 0; padding: 0; }
+  ul { list-style: none; }
+  svg.icon { width: 16px; height: 16px; flex: none; stroke: currentColor; fill: none; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; }
+
+  button, input { font: inherit; color: inherit; }
+  button { cursor: pointer; user-select: none; -webkit-tap-highlight-color: transparent; }
+  button:disabled { cursor: default; opacity: 0.6; }
+
+  .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+  .mono { font-family: var(--mono); }
+
+  /* ---- header ---- */
+  .bar {
+    display: flex; flex-wrap: wrap; align-items: center; gap: var(--s3) var(--s4);
+    padding: var(--s3) var(--s4);
+    border-bottom: var(--line) solid var(--border);
+    background: var(--surface);
+  }
+  .brand { font: 600 var(--t-lg)/1.2 var(--mono); letter-spacing: -0.02em; }
+  .brand span { color: var(--accent); }
+  .scan { display: flex; flex: 1 1 320px; gap: var(--s2); min-width: 0; }
+  .field {
+    flex: 1; min-width: 0; min-height: var(--tap);
+    padding: 0 var(--s3);
+    background: var(--sunken);
+    border: var(--line) solid var(--border);
+    border-radius: var(--radius);
+    font-family: var(--mono); font-size: var(--t-sm);
+  }
+  .field::placeholder { color: var(--muted); }
+  .btn {
+    min-height: var(--tap); padding: 0 var(--s4);
+    background: var(--accent); color: var(--on-accent);
+    border: 0; border-radius: var(--radius);
+    font-weight: 600;
+    transition: transform var(--fast) ease-out;
+  }
+  .btn:active:not(:disabled) { transform: scale(0.97); }
+  .status { flex-basis: 100%; font-size: var(--t-sm); color: var(--muted); overflow-wrap: anywhere; }
+  .status.is-error { color: var(--warn); }
+
+  /* ---- tabs ---- */
+  .tabs {
+    display: flex; gap: var(--s1);
+    padding: 0 var(--s4);
+    border-bottom: var(--line) solid var(--border);
+    overflow-x: auto; scrollbar-width: none;
+  }
+  .tab {
+    display: flex; align-items: baseline; gap: var(--s2);
+    min-height: var(--tap); padding: 0 var(--s3);
+    background: none; border: 0;
+    border-bottom: 2px solid transparent;
+    color: var(--muted); white-space: nowrap;
+  }
+  .tab[aria-selected="true"] { color: var(--text); font-weight: 600; border-bottom-color: var(--accent); }
+  .tab .count { font: var(--t-sm) var(--mono); font-variant-numeric: tabular-nums; color: var(--muted); }
+  .tab[aria-selected="true"] .count { color: var(--accent); }
+  @media (hover: hover) { .tab:hover { color: var(--text); } }
+
+  /* ---- panes ---- */
+  main { display: grid; grid-template-columns: minmax(280px, 380px) minmax(0, 1fr); min-height: 0; }
+  .pane { min-height: 0; overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin; scrollbar-color: var(--border) transparent; }
+  .list-pane { border-right: var(--line) solid var(--border); background: var(--surface); }
+  .filter {
+    position: sticky; top: 0; z-index: 1;
+    display: flex; align-items: center; gap: var(--s2);
+    padding: var(--s2) var(--s4);
+    background: var(--surface);
+    border-bottom: var(--line) solid var(--border);
+    color: var(--muted);
+  }
+  .filter input { flex: 1; min-width: 0; min-height: var(--s6); background: none; border: 0; color: var(--text); font-size: var(--t-sm); }
+  .filter input:focus-visible { outline: none; }
+  .filter:focus-within { box-shadow: inset 0 -2px 0 var(--accent); }
+
+  .note { padding: var(--s2) var(--s4); font-size: var(--t-sm); color: var(--warn); background: var(--warn-soft); border-bottom: var(--line) solid var(--border); }
+
+  .row {
+    display: grid; gap: var(--s1);
+    width: 100%; padding: var(--s3) var(--s4);
+    background: none; border: 0; border-bottom: var(--line) solid var(--border);
+    border-left: 2px solid transparent;
+    text-align: left;
+    scroll-margin-top: calc(var(--tap) + var(--s2));
+  }
+  .row[aria-current="true"] { background: var(--accent-soft); border-left-color: var(--accent); }
+  .row:focus-visible { outline-offset: -2px; }
+  @media (hover: hover) { .row:hover:not([aria-current="true"]) { background: var(--sunken); } }
+  .row-title { font: 600 var(--t-md)/1.3 var(--mono); overflow-wrap: anywhere; }
+  .row-sub { font-size: var(--t-sm); color: var(--muted); display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; overflow-wrap: anywhere; }
+  .chips { display: flex; flex-wrap: wrap; gap: var(--s1); }
+  .chip {
+    padding: 0 var(--s2);
+    border: var(--line) solid var(--border); border-radius: var(--radius);
+    font: var(--t-xs)/1.7 var(--mono); letter-spacing: 0.02em;
+    color: var(--muted); white-space: nowrap;
+  }
+  .chip.warn { color: var(--warn); background: var(--warn-soft); border-color: transparent; }
+  .chip.off { text-decoration: line-through; }
+
+  /* ---- detail ---- */
+  .detail-pane { padding: var(--s5) var(--s6) var(--s6); }
+  .detail { display: grid; gap: var(--s5); max-width: 920px; }
+  .back { display: none; align-items: center; gap: var(--s2); min-height: var(--tap); padding: 0; background: none; border: 0; color: var(--accent); font-weight: 600; }
+  .detail h2 { font: 600 var(--t-xl)/1.15 var(--mono); letter-spacing: -0.02em; overflow-wrap: anywhere; text-wrap: balance; }
+  .lede { max-width: 70ch; color: var(--muted); text-wrap: pretty; margin-top: var(--s2); }
+  .head .chips { margin-top: var(--s3); }
+  .eyebrow { font: 600 var(--t-xs)/1.4 var(--sans); letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); margin-bottom: var(--s2); }
+
+  .scroll-x { overflow-x: auto; scrollbar-width: thin; scrollbar-color: var(--border) transparent; }
+  table { border-collapse: collapse; width: 100%; font-size: var(--t-sm); }
+  th, td { padding: var(--s2) var(--s4) var(--s2) 0; text-align: left; vertical-align: top; border-bottom: var(--line) solid var(--border); }
+  th { font-weight: 600; color: var(--muted); white-space: nowrap; }
+  td.mono { overflow-wrap: anywhere; }
+
+  .kv { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: var(--s1) var(--s4); font-size: var(--t-sm); }
+  .kv dt { color: var(--muted); }
+  .kv dd { font-family: var(--mono); overflow-wrap: anywhere; }
+  .kv dd.num { font-variant-numeric: tabular-nums; }
+  .block + .block { padding-top: var(--s4); border-top: var(--line) solid var(--border); }
+  .block + .block { margin-top: var(--s4); }
+
+  .files { display: flex; flex-wrap: wrap; gap: var(--s1) var(--s3); font: var(--t-sm) var(--mono); }
+
+  .source {
+    margin: 0; padding: var(--s4);
+    background: var(--surface);
+    border: var(--line) solid var(--border); border-radius: var(--radius);
+    font: var(--t-sm)/1.6 var(--mono);
+    white-space: pre-wrap; overflow-wrap: anywhere;
+    tab-size: 2;
+  }
+  .source .fm { color: var(--muted); }
+  .source .hd { font-weight: 700; color: var(--accent); }
+
+  .empty { display: grid; gap: var(--s3); max-width: 60ch; padding: var(--s5) var(--s4); color: var(--muted); }
+  .empty strong { color: var(--text); font-size: var(--t-lg); font-weight: 600; }
+  .empty ul { font: var(--t-sm)/1.7 var(--mono); }
+
+  @media (max-width: 760px) {
+    main { grid-template-columns: minmax(0, 1fr); }
+    .list-pane { border-right: 0; }
+    main[data-view="list"] .detail-pane, main[data-view="detail"] .list-pane { display: none; }
+    .detail-pane { padding: var(--s3) var(--s4) var(--s5); }
+    .back { display: inline-flex; }
+  }
+  @media (prefers-reduced-motion: reduce) { .btn { transition: none; } }
+</style>
+</head>
+<body>
+
+<header class="bar">
+  <h1 class="brand"><span>/</span>inspect</h1>
+  <form class="scan" id="scan-form">
+    <label class="sr-only" for="path">Project folder</label>
+    <input class="field" id="path" name="path" list="dirs" placeholder="/path/to/project" spellcheck="false" autocomplete="off" autocapitalize="off">
+    <datalist id="dirs"></datalist>
+    <button class="btn" id="scan-btn" type="submit">Scan</button>
+  </form>
+  <p class="status" id="status" role="status" aria-live="polite"></p>
+</header>
+
+<div class="tabs" id="tabs" role="tablist" aria-label="What to check"></div>
+
+<main id="main" data-view="list">
+  <section class="pane list-pane" aria-label="Items">
+    <label class="filter">
+      <svg class="icon" viewBox="0 0 16 16" aria-hidden="true"><circle cx="7" cy="7" r="4.5"/><path d="M10.5 10.5 14 14"/></svg>
+      <span class="sr-only">Filter the list</span>
+      <input id="filter" type="search" placeholder="Filter  ( / )" spellcheck="false" autocomplete="off">
+    </label>
+    <div id="list"></div>
+  </section>
+  <section class="pane detail-pane" id="detail" aria-label="Details"></section>
+</main>
+
+<script>
+const TABS = [
+  { id: 'skills', label: 'Skills', noun: 'skills' },
+  { id: 'mcp', label: 'MCP servers', noun: 'MCP servers' },
+  { id: 'agents', label: 'Agents', noun: 'agents' },
+  { id: 'instructions', label: 'Instructions', noun: 'CLAUDE.md or AGENTS.md files' },
+];
+const RECENT_KEY = 'inspect.recent';
+
+const params = new URLSearchParams(location.search);
+const state = {
+  data: null,
+  tab: TABS.some((t) => t.id === params.get('tab')) ? params.get('tab') : 'skills',
+  item: params.get('item'),
+  filter: '',
+};
+
+const $ = (id) => document.getElementById(id);
+
+function h(tag, props = {}, ...children) {
+  const el = document.createElement(tag);
+  for (const [key, value] of Object.entries(props)) {
+    if (value === false || value == null) continue;
+    if (key === 'class') el.className = value;
+    else if (key.startsWith('on')) el.addEventListener(key.slice(2), value);
+    else el.setAttribute(key, value);
+  }
+  el.append(...children.flat().filter((c) => c != null && c !== false));
+  return el;
+}
+
+function icon(d) {
+  const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+  svg.setAttribute('class', 'icon');
+  svg.setAttribute('viewBox', '0 0 16 16');
+  svg.setAttribute('aria-hidden', 'true');
+  const p = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+  p.setAttribute('d', d);
+  svg.append(p);
+  return svg;
+}
+
+const chip = (label, tone = '') => h('span', { class: `chip ${tone}` }, label);
+const unique = (list) => [...new Set(list)];
+const size = (text) => ({ lines: text.split('\n').length, tokens: Math.round(text.length / 4) });
+const number = (n) => n.toLocaleString('en-US');
+
+// ---- one view model per tab: what the list row shows ----
+
+const STATUS_TONE = { enabled: '', pending: 'warn', disabled: 'off' };
+const STATUS_LABEL = { enabled: 'enabled', pending: 'needs approval', disabled: 'disabled' };
+
+const VIEW = {
+  skills: (s) => ({
+    id: s.name,
+    title: s.name,
+    sub: s.description,
+    chips: [
+      ...unique(s.locations.filter((l) => l.tool !== 'Source').map((l) => l.tool)).map((t) => chip(t)),
+      !s.installed && chip('not installed', 'warn'),
+      s.differs && chip('copies differ', 'warn'),
+      s.locations.some((l) => l.broken) && chip('broken link', 'warn'),
+    ],
+  }),
+  mcp: (m) => ({
+    id: m.name,
+    title: m.name,
+    sub: m.definitions[0].command || m.definitions[0].url,
+    chips: m.definitions.map((d) =>
+      {
+      const label = d.scope === 'project' ? d.tool : `${d.tool} (${d.scope})`;
+      return chip(d.status === 'enabled' ? label : `${label}: ${STATUS_LABEL[d.status]}`, STATUS_TONE[d.status]);
+    }),
+  }),
+  agents: (a) => ({
+    id: a.path,
+    title: a.name,
+    sub: a.description,
+    chips: [chip(a.tool === 'Source' ? 'not installed' : a.tool, a.tool === 'Source' ? 'warn' : ''), a.model && chip(a.model)],
+  }),
+  instructions: (i) => ({
+    id: i.path,
+    title: i.path,
+    sub: `${number(size(i.content).lines)} lines, about ${number(size(i.content).tokens)} tokens`,
+    chips: [chip(i.tool), chip(i.scope), i.linkTarget && chip('symlink')],
+  }),
+};
+
+function visibleItems() {
+  const items = state.data?.[state.tab] ?? [];
+  const query = state.filter.trim().toLowerCase();
+  if (!query) return items;
+  return items.filter((item) => {
+    const view = VIEW[state.tab](item);
+    return `${view.title} ${view.sub}`.toLowerCase().includes(query);
+  });
+}
+
+// ---- rendering ----
+
+function renderTabs() {
+  $('tabs').replaceChildren(...TABS.map((tab) =>
+    h('button', {
+      class: 'tab', type: 'button', role: 'tab',
+      'aria-selected': String(tab.id === state.tab),
+      onclick: () => update({ tab: tab.id, item: null, view: 'list' }),
+    }, tab.label, h('span', { class: 'count' }, state.data ? String(state.data[tab.id].length) : '–'))));
+}
+
+function emptyState() {
+  const tab = TABS.find((t) => t.id === state.tab);
+  if (state.filter.trim()) {
+    return h('div', { class: 'empty' }, h('strong', {}, 'No match'), h('p', {}, 'Clear the filter to see all items.'));
+  }
+  return h('div', { class: 'empty' },
+    h('strong', {}, `No ${tab.noun} in this project`),
+    h('p', {}, 'These project paths were checked:'),
+    h('ul', {}, state.data.checked[state.tab].map((p) => h('li', {}, p))));
+}
+
+function renderList() {
+  const list = $('list');
+  if (!state.data) return list.replaceChildren();
+  const items = visibleItems();
+  const rows = items.map((item) => {
+    const view = VIEW[state.tab](item);
+    return h('button', {
+      class: 'row', type: 'button', 'data-id': view.id,
+      'aria-current': String(view.id === state.item),
+      onclick: () => update({ item: view.id, view: 'detail' }),
+    },
+      h('span', { class: 'row-title' }, view.title),
+      view.sub && h('span', { class: 'row-sub' }, view.sub),
+      h('span', { class: 'chips' }, view.chips));
+  });
+
+  const missing = state.tab === 'instructions' && items.length
+    ? ['CLAUDE.md', 'AGENTS.md'].filter((name) => !state.data.instructions.some((i) => i.path === name))
+    : [];
+  list.replaceChildren(
+    missing.length ? h('p', { class: 'note' }, `No ${missing.join(' or ')} at the project root.`) : '',
+    ...(rows.length ? rows : [emptyState()]));
+}
+
+function sourceBlock(text) {
+  const pre = h('pre', { class: 'source', tabindex: '0' });
+  const lines = text.split('\n');
+  let inFrontmatter = lines[0].trim() === '---';
+  let inFence = false;
+  lines.forEach((line, i) => {
+    let cls = '';
+    if (inFrontmatter) {
+      cls = 'fm';
+      if (i > 0 && line.trim() === '---') inFrontmatter = false;
+    } else if (/^\s*(```|~~~)/.test(line)) {
+      inFence = !inFence;
+    } else if (!inFence && /^#{1,6}\s/.test(line)) {
+      cls = 'hd';
+    }
+    pre.append(cls ? h('span', { class: cls }, line) : line, i < lines.length - 1 ? '\n' : '');
+  });
+  return pre;
+}
+
+const section = (title, ...body) => h('section', {}, h('h3', { class: 'eyebrow' }, title), ...body);
+
+function kv(pairs) {
+  return h('dl', { class: 'kv' }, pairs.filter(([, value]) => value).flatMap(([key, value, cls]) =>
+    [h('dt', {}, key), h('dd', { class: cls ?? '' }, value)]));
+}
+
+function table(headers, rows) {
+  return h('div', { class: 'scroll-x' }, h('table', {},
+    h('thead', {}, h('tr', {}, headers.map((t) => h('th', { scope: 'col' }, t)))),
+    h('tbody', {}, rows.map((cells) => h('tr', {}, cells.map((c, i) => h('td', { class: i ? 'mono' : '' }, c)))))));
+}
+
+function contentSection(title, text) {
+  const { lines, tokens } = size(text);
+  return section(`${title} · ${number(lines)} lines · about ${number(tokens)} tokens`, sourceBlock(text));
+}
+
+const DETAIL = {
+  skills: (s) => [
+    section('Locations', table(['Tool', 'Path', 'Links to'], s.locations.map((l) =>
+      [l.tool, l.path, l.broken ? 'broken link: ' + l.linkTarget : l.linkTarget ?? 'a real folder, not a link']))),
+    s.differs && h('p', { class: 'note' }, 'The SKILL.md copies are not the same in all locations. The content below is from the first location.'),
+    kv([['Installed from', s.source], ['Files', String(s.files.length), 'num']]),
+    s.files.length > 1 && section('Files in the skill', h('ul', { class: 'files' }, s.files.map((f) => h('li', {}, f)))),
+    s.content && contentSection('SKILL.md', s.content),
+  ],
+  mcp: (m) => [
+    section('Definitions', m.definitions.map((d) => h('div', { class: 'block' }, kv([
+      ['Tool', d.tool],
+      ['Scope', d.scope],
+      ['File', d.file],
+      ['Status', STATUS_LABEL[d.status]],
+      ['Transport', d.transport],
+      ['Command', d.command],
+      ['URL', d.url],
+      ['Env keys', d.envKeys.join(', ')],
+      ['Header keys', d.headerKeys.join(', ')],
+    ])))),
+    h('p', { class: 'lede' }, 'Env values, header values, and URL query values are not read into this page.'),
+  ],
+  agents: (a) => [
+    kv([
+      ['Tool', a.tool === 'Source' ? 'None. This file is in the repo, but no tool loads it from here.' : a.tool],
+      ['Path', a.path],
+      ['Links to', a.linkTarget],
+      ['Model', a.model],
+      ['Tools', a.tools],
+    ]),
+    contentSection('Agent file', a.content),
+  ],
+  instructions: (i) => [
+    kv([
+      ['Read by', i.tool === 'Claude Code' ? i.tool : 'Codex, Cursor, opencode, and other AGENTS.md tools'],
+      ['Scope', i.scope],
+      ['Links to', i.linkTarget],
+      ['Imports', i.imports.map((p) => `@${p}`).join(', ')],
+    ]),
+    contentSection(i.path, i.content),
+  ],
+};
+
+function renderDetail() {
+  const pane = $('detail');
+  if (!state.data) return pane.replaceChildren();
+  const item = (state.data[state.tab] ?? []).find((x) => VIEW[state.tab](x).id === state.item);
+  if (!item) {
+    return pane.replaceChildren(h('div', { class: 'empty' }, h('p', {}, 'Select an item to see its details.')));
+  }
+  const view = VIEW[state.tab](item);
+  pane.replaceChildren(h('article', { class: 'detail' },
+    h('div', { class: 'head' },
+      h('button', { class: 'back', type: 'button', onclick: () => update({ view: 'list' }) },
+        icon('M9.5 3.5 5 8l4.5 4.5'), 'Back to the list'),
+      h('h2', {}, view.title),
+      state.tab !== 'instructions' && view.sub && h('p', { class: 'lede' }, view.sub),
+      h('div', { class: 'chips' }, view.chips)),
+    ...DETAIL[state.tab](item)));
+  pane.scrollTop = 0;
+}
+
+function update(patch) {
+  const { view, ...rest } = patch;
+  Object.assign(state, rest);
+  if (state.data && !state.item) state.item = visibleItems().map((x) => VIEW[state.tab](x).id)[0] ?? null;
+  if (view) $('main').dataset.view = view;
+
+  const query = new URLSearchParams();
+  if (state.data) query.set('path', state.data.root);
+  query.set('tab', state.tab);
+  if (state.item) query.set('item', state.item);
+  history.replaceState(null, '', `?${query}`);
+
+  renderTabs();
+  renderList();
+  renderDetail();
+  $('list').querySelector('.row[aria-current="true"]')?.scrollIntoView({ block: 'nearest' });
+}
+
+// ---- scanning ----
+
+function recent() {
+  try {
+    const list = JSON.parse(localStorage.getItem(RECENT_KEY));
+    return Array.isArray(list) ? list.filter((p) => typeof p === 'string') : [];
+  } catch {
+    return [];
+  }
+}
+
+function fillSuggestions(paths) {
+  $('dirs').replaceChildren(...paths.map((p) => h('option', { value: p })));
+}
+
+async function scan(path, keepItem = false) {
+  const button = $('scan-btn');
+  const status = $('status');
+  button.disabled = true;
+  button.textContent = 'Scanning';
+  try {
+    const res = await fetch(`/api/scan${path ? `?path=${encodeURIComponent(path)}` : ''}`);
+    const body = await res.json();
+    if (!res.ok) throw new Error(body.error);
+    $('path').value = body.root;
+    document.title = `${body.name} · inspect`;
+    status.className = 'status';
+    status.textContent = `${body.name} · ${body.isGitRepo ? 'git repo' : 'not a git repo'} · read-only scan of the project scope`;
+    localStorage.setItem(RECENT_KEY, JSON.stringify(unique([body.root, ...recent()]).slice(0, 8)));
+    update({ data: body, item: keepItem ? state.item : null, view: 'list' });
+  } catch (err) {
+    status.className = 'status is-error';
+    status.textContent = err instanceof TypeError
+      ? 'The inspect server does not answer. Start it again with: node server.mjs'
+      : err.message;
+  } finally {
+    button.disabled = false;
+    button.textContent = 'Scan';
+  }
+}
+
+$('scan-form').addEventListener('submit', (event) => {
+  event.preventDefault();
+  scan($('path').value.trim());
+});
+
+let suggestTimer;
+$('path').addEventListener('input', (event) => {
+  clearTimeout(suggestTimer);
+  const typed = event.target.value;
+  if (!typed) return fillSuggestions(recent());
+  suggestTimer = setTimeout(async () => {
+    const res = await fetch(`/api/dirs?path=${encodeURIComponent(typed)}`).catch(() => null);
+    if (res?.ok) fillSuggestions(await res.json());
+  }, 200);
+});
+
+$('filter').addEventListener('input', (event) => update({ filter: event.target.value }));
+
+$('list').addEventListener('keydown', (event) => {
+  if (event.key !== 'ArrowDown' && event.key !== 'ArrowUp') return;
+  const rows = [...$('list').querySelectorAll('.row')];
+  const next = rows[rows.indexOf(document.activeElement) + (event.key === 'ArrowDown' ? 1 : -1)];
+  if (!next) return;
+  event.preventDefault();
+  update({ item: next.dataset.id });
+  $('list').querySelector('.row[aria-current="true"]')?.focus();
+});
+
+document.addEventListener('keydown', (event) => {
+  if (event.key === '/' && !event.target.closest('input')) {
+    event.preventDefault();
+    $('filter').focus();
+  } else if (event.key === 'Escape' && $('main').dataset.view === 'detail') {
+    update({ view: 'list' });
+  }
+});
+
+fillSuggestions(recent());
+renderTabs();
+scan(params.get('path') ?? '', true);
+</script>
+</body>
+</html>
