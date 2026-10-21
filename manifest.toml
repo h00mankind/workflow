@@ -27,3 +27,8 @@ harnesses = ["claude", "codex", "opencode"]
 [project."~/Documents/h00man.code/labs-by-nexlabs"]
 plugins = ["h00man", "matt"]
 codex = ["pstack"]
+
+[project."~/Documents/h00man.code/shuko"]
+plugins = ["h00man/variants", "h00man/unslop", "h00man/frontend", "h00man/eli5", "h00man/caveman"]
+
+[project."~/Documents/h00man.code/okkotsu"]
