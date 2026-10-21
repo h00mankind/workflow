@@ -1,0 +1,15 @@
+{
+  "claude-code": {
+    "reason": "Our engine links a whole plugin for Claude Code. The manifest also knows it as claude.",
+    "kind": "claude-plugin",
+    "aliases": ["claude"]
+  },
+  "codex": {
+    "reason": "Our engine installs a whole plugin for Codex as a marketplace.",
+    "kind": "codex-plugin"
+  },
+  "opencode": {
+    "reason": "OpenCode also reads .opencode/skills. Codex reads .agents/skills, so a link there gives Codex each skill twice.",
+    "project": ".opencode/skills"
+  }
+}

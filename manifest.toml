@@ -1,0 +1,34 @@
+# What goes where. `workflow-setup status` shows the drift between this file
+# and the disk. `workflow-setup apply` corrects it.
+#
+# A scope is [global] (the home folder) or [project."<path>"]. In a scope:
+#   plugins    plugins for every harness of the scope
+#   claude     more plugins, for Claude Code only (any agent name works)
+#   harnesses  the harnesses of the scope. Without it: claude and codex.
+#
+# Only a harness gets `plugins`. An agent key alone, such as
+# cursor = ["h00man/plan"], gives that agent those entries and nothing more.
+#
+# A plugin is a folder in plugins/. Its name is the prefix of its skills.
+
+# pstack is global for Claude Code only. For Codex it stays off at global
+# scope and is enabled for each project.
+[global]
+claude = ["pstack"]
+
+[project."~/Documents/h00man.code/workflow"]
+plugins = ["h00man", "matt"]
+harnesses = ["claude", "codex", "opencode"]
+
+[project."~/Documents/h00man.code/mcgg"]
+plugins = ["h00man", "matt"]
+harnesses = ["claude", "codex", "opencode"]
+
+[project."~/Documents/h00man.code/labs-by-nexlabs"]
+plugins = ["h00man", "matt"]
+codex = ["pstack"]
+
+[project."~/Documents/h00man.code/shuko"]
+plugins = ["h00man/variants", "h00man/unslop", "h00man/frontend", "h00man/eli5", "h00man/caveman"]
+
+[project."~/Documents/h00man.code/okkotsu"]

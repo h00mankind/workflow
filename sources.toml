@@ -1,0 +1,29 @@
+# Outside sources. Each table is one git repository that the library keeps
+# as a verbatim copy in plugins/<name>/. The table name is the plugin name,
+# and thus the prefix of its skills: <name>:<skill>.
+#
+#   repository  where to fetch from: a URL, or a local clone (no push needed)
+#   path        the folder in the repository to copy from
+#   commit      the pin: the commit the copy came from. `sources accept` moves it.
+#   plugin      true: `path` is a complete plugin, copied as it is.
+#               Without it, `path` holds skills, and the engine writes the
+#               plugin manifests.
+#   skills      the skills to copy. Without it, every skill under `path`.
+#   branch      the branch to follow. Without it, the default branch.
+#
+# The order here is the order of precedence where skills install without a
+# prefix. plugins/h00man/ always wins.
+
+[matt]
+repository = "https://github.com/mattpocock/skills"
+path = "skills"
+skills = ["teach", "handoff", "writing-for-agents"]
+commit = "24fe0ef7737efae15c87225755e9f6f5965e4888"
+
+# My port of pstack. The fetch reads the local clone, so a commit there is
+# enough. It is a complete plugin: skills, agents, and hooks.
+[pstack]
+repository = "/Users/h0_0man/Documents/h00man.code/pstack-claude"
+path = "plugins/pstack"
+plugin = true
+commit = "aa42c8310138836c07b7f0b6945225ffa4a81c87"
