@@ -257,14 +257,15 @@ function validate() {
   const required = ["id", "name", "type", "gloss", "tier"];
   CANDIDATES.forEach((c, i) => {
     required.forEach(k => { if (c[k] == null || c[k] === "") errs.push(`#${i + 1} (${c.name || "?"}) is missing "${k}".`); });
-    if (seen.has(c.id)) errs.push(`Duplicate id ${JSON.stringify(c.id)} (${c.name}).`);
-    seen.add(c.id);
+    // 1 and "1" would share a focus key and a saved-star slot, so compare ids as strings.
+    if (seen.has(String(c.id))) errs.push(`Duplicate id ${JSON.stringify(c.id)} (${c.name}).`);
+    seen.add(String(c.id));
     if (typeof c.rec !== "boolean") errs.push(`${c.name}: "rec" must be true or false.`);
     if (!TYPES.includes(c.type)) errs.push(`${c.name}: type "${c.type}" is not in TYPES.`);
     if (isQuick && !c.rec) errs.push(`${c.name}: quick mode shows no pool, so every candidate needs rec: true.`);
     if (c.rank != null && !c.rec) errs.push(`${c.name}: a ranked top pick must also be rec: true.`);
   });
-  const norm = s => String(s).toLowerCase().replace(/[^a-z0-9]/g, "");
+  const norm = s => String(s).normalize("NFKD").toLowerCase().replace(/[^\p{L}\p{N}]/gu, "");
   const names = new Map();
   CANDIDATES.forEach(c => { const k = norm(c.name); if (names.has(k)) errs.push(`Duplicate name: ${names.get(k)} / ${c.name}.`); else names.set(k, c.name); });
   return errs;
@@ -359,6 +360,7 @@ function card(c) {
 function render() {
   // Remember focus by key so re-rendering does not drop keyboard users.
   const focusKey = document.activeElement && document.activeElement.dataset ? document.activeElement.dataset.key : null;
+  $("#copyFallback").classList.add("hidden"); // a shown fallback would go stale once stars change
 
   const counts = {};
   coverageTypes.forEach(t => counts[t] = 0);

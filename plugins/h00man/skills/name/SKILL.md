@@ -65,7 +65,7 @@ Generate by mode: **deep → 100+ candidates**, **quick → ~20**. Either way, d
 
 Generation tactics that produce range: **morpheme tables** (prefixes `inter-/trans-/ultra-/neo-`, suffixes `-ify/-ly/-io/-ai/-ex/-on/-ium/-os`); **synonym/thesaurus walks** of the core concept; **foreign-language and Latin/Greek roots**; **metaphor mining** ("if this were an animal / a place / a sound / a myth, what would it be?"); **acronym hunts** (write the descriptive phrase, then mine its initials for a pronounceable string); **sound-pattern templates** (CVCV, alliteration, palindromes, reduplication); **etymology walks** from the root word outward.
 
-**Default to suggestive, arbitrary, invented, portmanteau, or palindrome.** Avoid purely descriptive names unless the user insists — they're weak legally and forgettable, and successful ones eventually rebrand (KFC, RH, WW). Acronyms are usually weak as *primary* names: they carry no image, and letters that stand for a descriptive phrase stay legally weak. A pronounceable one (IKEA, NASA) is easier to say and remember, but that does not make it legally stronger. Generate a few; don't lead with them.
+**Default to suggestive, arbitrary, invented, portmanteau, or palindrome.** Avoid purely descriptive names unless the user insists — they're weak legally and forgettable, and successful ones eventually rebrand (KFC, RH, WW). Acronyms are usually weak as *primary* names: they carry no image, and if buyers read the letters as their descriptive phrase, the acronym is as legally weak as the phrase. A pronounceable one (IKEA, NASA) is easier to say and remember, but that does not make it legally stronger. Generate a few; don't lead with them.
 
 ## Step 3 — Screen
 
