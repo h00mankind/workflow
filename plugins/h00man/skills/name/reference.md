@@ -1,28 +1,6 @@
-# The Complete Guide to Brand Naming: Taxonomies, Linguistics, Law, and Practice
+# Brand naming reference: taxonomies, linguistics, law, and practice
 
-## TL;DR
-
-- **Brand naming is a disciplined hybrid of linguistics, law, and strategy** — not a creative whim. The leading practitioners (Lexicon Branding, Lippincott, Interbrand, Igor International, A Hundred Monkeys, Catchword, Operative Words) treat it as a six-to-twelve-week process moving from strategic brief → ideation in the thousands → linguistic/sound-symbolic screening → trademark and domain clearance → cross-cultural review → finalist testing.
-- **Two frameworks dominate the field.** Branding agencies classify names along a "type" taxonomy (descriptive → suggestive → associative/metaphoric → invented/fanciful → abstract, plus structural variants such as acronyms, eponyms, geographic, compound, blend, lexical, foreign, mimetic, and altered-spelling names). U.S. trademark law classifies them along the *Abercrombie* spectrum of distinctiveness (generic → descriptive → suggestive → arbitrary → fanciful). The two frameworks pull in the same direction: the more distinctive a name is creatively, the stronger it is legally.
-- **The decisive lever in modern naming is sound symbolism plus trademark and domain scarcity.** Research by Yorkston & Menon (2004), Klink (2000), and Lowrey & Shrum (2007) demonstrates that phonemes systematically carry meaning (front vowels = small/light/fast; back vowels = large/heavy/slow; fricatives = soft; stops = hard). Combined with the *Abercrombie* doctrine and the saturation of trademark and .com space (over 3.3 million active U.S. federal trademark registrations as of Q1 2025, per the USPTO Data Visualization Center), this drives modern practice toward short, distinctive, evocative or invented names that "feel" right before they "mean" anything — Pentium, Sonos, Häagen-Dazs, Google, Lyft, Vercel.
-
----
-
-## Key Findings
-
-1. **There is no single canonical taxonomy of brand names.** Different agencies use different cuts. Igor International (Steve Manning & Jay Jurisich) uses four categories — Functional, Invented, Experiential, Evocative — plotted on a "Levels of Engagement" chart with tiers from −2 to +5. Academic content-analyses (e.g., the comprehensive content analysis of the top 500 global brand names) classify by morphological mechanism (eponymous, geographic, compound, abbreviation, blend, etc.). Marty Neumeier and Alina Wheeler use criteria-based filters rather than a closed taxonomy.
-
-2. **The *Abercrombie & Fitch Co. v. Hunting World* spectrum is the legal backbone of every naming project.** It ranks marks generic → descriptive → suggestive → arbitrary → fanciful. Only the last three are *inherently distinctive*; descriptive marks require acquired distinctiveness (secondary meaning); generic marks cannot be protected at all.
-
-3. **Phonetic symbolism research is robust enough to be used predictively.** Yorkston & Menon (2004) showed effects are automatic; Klink (2000) showed front vowels (i, ee) signal small/light/feminine; Lowrey & Shrum (2007) and Shrum et al. (2012) showed these effects generalize across French, Spanish, and Chinese speakers — a finding directly relevant to global brand names. The bouba/kiki effect (Köhler 1929; Ramachandran & Hubbard 2001; Ćwiek et al. 2022, *Phil. Trans. R. Soc. B* 377:20200390) was found to be robust across 17 of 25 tested languages, with a 25-language posterior mean of 72% congruent responses (95% credible interval: 56–82%).
-
-4. **Lexicon Branding's process — used to create Pentium, BlackBerry, Sonos, Swiffer, Febreze, Dasani, Azure, Vercel, Windsurf, Impossible Burger — is the most documented professional methodology.** Founder David Placek uses three parallel creative teams, one of which is deliberately misdirected; runs the candidates through a global network of ~100 linguists in ~75 countries; insists that 1,000–1,500 candidates are needed; and treats *polarizing* internal reaction as the signal of a strong name.
-
-5. **Domain scarcity and trademark congestion are now the dominant practical constraints.** The USPTO Data Visualization Center recorded approximately 3.3 million active federal trademark registrations as of Q1 2025, and the "electrical and scientific apparatus" class alone grew from ~75,000 marks in 1982 to ~800,000 today (per Placek). This congestion drives the dropped-vowel/CVCV/-ly/-ify trends and explains why modern names cluster around invented forms.
-
-6. **For global brands, the China market changes the calculus.** The four standard strategies — phonetic, semantic, phonosemantic (dual), and transcreated — produce dramatically different equity. Coca-Cola's *Kěkǒu kělè* (可口可乐, "delicious happiness") and BMW's *Bǎomǎ* (宝马, "precious horse") are textbook successes; Best Buy's *Bǎisīmǎi* (百思买, "think a hundred times before you buy") and Mercedes-Benz's early *Bēnsī* (heard as *Bēnsǐ*, "rush to die") are textbook failures.
-
----
+Background facts for the `name` skill. `SKILL.md` holds the workflow; when this file and `SKILL.md` differ on what to do, `SKILL.md` wins. Agency-scale numbers here (500–2,000 candidates, 6–12 weeks) describe professional practice, not targets for the skill.
 
 ## Details
 
@@ -42,11 +20,11 @@ Brand-name taxonomies are descriptive tools, not laws. Most agencies use a hybri
 | **Acronym/Initialism** | Reduction to initial letters. | IBM, KFC, BMW, DHL, BP. |
 | **Founder/Eponymous** | Named after a person. | Ford, Disney, Tesla (after Nikola Tesla), Adidas (Adi Dassler), Hewlett-Packard, McDonald's. |
 | **Geographic** | Named for a place. | American Airlines, Patagonia, Cisco (from "San Francisco"), Fuji. |
-| **Compound** | Two real words fused. | Facebook, YouTube, Snapchat, PayPal, FedEx, Salesforce, BlackBerry. |
-| **Blend/Portmanteau** | Two words *merged* by chopping. | Pinterest (pin + interest), Microsoft (micro + software), Instagram (instant + telegram), Groupon, Wikipedia. |
+| **Compound** | Two real words fused. | Facebook, YouTube, Snapchat, PayPal, Salesforce, BlackBerry. (FedEx clips its words, so it is a blend.) |
+| **Blend/Portmanteau** | Two words *merged* by chopping. | Pinterest (pin + interest), Microsoft (micro + software), Instagram (instant + telegram), Verizon (veritas + horizon), FedEx, Groupon, Wikipedia. |
 | **Lexical/Real-word** | An ordinary dictionary word used directly. | Oracle, Twitter, Visa, Dove. |
-| **Foreign/Borrowed** | A word from another language. | Häagen-Dazs (faux-Danish), Lego ("leg godt," Danish "play well"), Volvo (Latin "I roll"), Audi (Latin for Horch/"listen"). |
-| **Mimetic/Onomatopoeic** | The sound *is* part of the meaning. | Twitter, Zappos (from *zapatos*, Spanish for shoes), Yahoo!, Google (a misspelling of "googol"). |
+| **Foreign/Borrowed** | A word from another language. | Volvo (Latin "I roll"), Audi (Latin for Horch/"listen"), Hulu (Mandarin "gourd"). Faux-foreign coinages such as Häagen-Dazs are invented names, not borrowings; Lego is a contraction of Danish *leg godt*. |
+| **Mimetic/Onomatopoeic** | The sound *is* part of the meaning. | Twitter (bird chatter), Bing (Microsoft: "the sound of found"), Schweppes (said to echo the fizz). |
 | **Misspellings/Alterations** | A familiar word respelled. | Lyft, Tumblr, Flickr, Krispy Kreme, Cheez-It, Reddit. |
 
 **b) Igor International's "Building the Perfect Beast" four-tier taxonomy.** Plotted on a "Levels of Engagement" chart with eight tiers (−2 to +5), where higher = more engaging and memorable. Verbatim definitions (Igor Naming Guide, ©2010, v6.4):
@@ -96,7 +74,7 @@ Igor's competitive-analysis tool is the **Name Taxonomy Chart**: plot every comp
 - "z" = "draws attention" (Azure, Zappos)
 - "x" = "signals innovation" (Xerox, Exxon)
 - "s" = "musical, atmospheric" (Sonos)
-- Plosive stops at name boundaries ("b," "k," "p," "t") feel energetic and crisp (BlackBerry has plosive bookends)
+- Plosive stops ("b," "k," "p," "t") feel energetic and crisp (the doubled *b* of BlackBerry, the *k* and *t* of Kit-Kat)
 
 **c) Sound symbolism (phonosemantics).** Klink (2000, *Marketing Letters*) established the core findings: brand names with **front vowels** (i, ee — as in *nidax*) were perceived as smaller, lighter, milder, thinner, softer, faster, colder, more bitter, more feminine, friendlier, weaker, and prettier than names with **back vowels** (a, o, u — as in *nodax*). **Fricatives** (f, s, v, z) read as smaller/faster/lighter than **stops/plosives** (b, d, g, p, t, k).
 
@@ -108,11 +86,11 @@ The connotative-meaning framework (Sidhu & Pexman 2018; Motoki et al. 2022) maps
 
 **d) The bouba/kiki effect.** First demonstrated by Wolfgang Köhler (1929) with the nonsense words *takete* and *maluma*, popularized by Ramachandran and Hubbard (2001) with *bouba* and *kiki*. Their original Tamil/American college-student sample reported that about 95% of subjects matched *bouba* to a rounded blob and *kiki* to a spiky shape. The most rigorous cross-cultural test to date — Ćwiek et al. (2022, *Phil. Trans. R. Soc. B* 377:20200390), spanning 25 languages and 10 writing systems — found a posterior mean of 72% congruent responses (95% credible interval: 56–82%) and confirmed the effect in 17 of 25 languages, with Chinese, Romanian, and Turkish as notable exceptions. Practical naming implication: a brand name's *shape associations* are partly hardwired — rounded vowels and voiced labials (Google, Coca-Cola, Volvo) feel softer; sharp consonants and front vowels (Kit-Kat, Tic Tac, Kickstarter) feel sharper.
 
-**e) Phonaesthetics — euphony and cacophony.** Phonaesthetic preference (the "beauty of sound") favors balanced consonant/vowel alternation (CVCV like *Coca, Toyota, Honda, Subaru, Yoda*), alliteration (Coca-Cola, Krispy Kreme, PayPal), and palindromes (Sonos, Honda, Otto). Placek calls Sonos his favorite Lexicon name precisely because it is "a mellifluous palindrome that reads the same upside down."
+**e) Phonaesthetics — euphony and cacophony.** Phonaesthetic preference (the "beauty of sound") favors balanced consonant/vowel alternation (CVCV like *Coca, Lego, Toyota, Subaru, Yoda*), alliteration (Coca-Cola, Krispy Kreme, PayPal), and palindromes (Sonos, Otto, Aviva). Placek calls Sonos his favorite Lexicon name precisely because it is "a mellifluous palindrome that reads the same upside down."
 
 **f) Syllable count and pronounceability.** Empirical and practical convergence: 1–4 syllables, with 2 syllables the modal sweet spot. Neumeier's rule of thumb: *"Four syllables or less. More than four, and people start to abbreviate the name in ways that could be detrimental to the brand."* Federal Express became FedEx for exactly this reason. Brand-name length research (Pathak et al. 2019) finds that longer names (>3 syllables) are perceived as more luxurious — relevant for premium positioning.
 
-**g) Cross-cultural and cross-linguistic.** Beyond bouba/kiki: tonal languages (Mandarin, Cantonese, Thai, Vietnamese) add a tonal layer to perceived meaning. Fan (1997) found that in Chinese, two-syllable brand names with high-pitched (H-H) tonic structure (47% of award-winning brands) or L-H (25%) dominate; the modifier-noun structure and positive connotation are also near-mandatory. The Chinese-language section below addresses transliteration specifically.
+**g) Cross-cultural and cross-linguistic.** Beyond bouba/kiki: tonal languages (Mandarin, Cantonese, Thai, Vietnamese) add a tonal layer to perceived meaning. Fan (1997) found that in one sample of award-winning Chinese brand names, two-syllable names with high-high (H-H, 47%) or low-high (L-H, 25%) tone patterns dominated, usually with modifier-noun structure and positive connotation. These are observed preferences in that sample, not rules. The Chinese-language section below addresses transliteration specifically.
 
 ---
 
@@ -135,7 +113,7 @@ The two most-cited evaluation checklists in the field:
 
 **d) Additional industry-standard criteria.**
 - **Domain availability** — exact-match .com still preferred for consumer brands; alternative TLDs (.co, .ai, .io) and prefixed domains (e.g., go-, get-, try-) common for startups.
-- **Trademark availability** — clean in target Nice classes (see §5).
+- **Trademark availability** — no conflicting mark in target or related Nice classes (see §5).
 - **Visual/typographic potential** — letterforms must work as a wordmark.
 - **Cultural appropriateness across markets** — see §6.
 - **Memorability** — measured via aided/unaided recall in consumer research.
@@ -156,13 +134,13 @@ The honest finding from Lexicon: "in 4,000 naming projects, … clients essentia
 | **Arbitrary** | Common word, unrelated use. | Inherently distinctive. | Apple (computers), Amazon (retail), Camel (cigarettes). |
 | **Fanciful** | Invented for use as a mark. | Strongest — inherently distinctive. | Kodak, Exxon, Xerox, Verizon, Häagen-Dazs. |
 
-The legal punchline: **suggestive, arbitrary, and fanciful marks can be registered immediately**; descriptive marks require evidence (5+ years of substantially exclusive use creates a presumption); generic terms cannot be marks. This is why agencies push clients away from "Pizza Hut" territory and toward "Pentium" territory.
+The legal punchline: **suggestive, arbitrary, and fanciful marks are inherently distinctive**, so they can register without proof of secondary meaning (other requirements, such as no likely confusion with a prior mark, still apply). Descriptive marks need evidence of acquired distinctiveness to reach the Principal Register; five years of substantially exclusive use is one kind of evidence the USPTO may accept, not an automatic pass. Until then they can sit on the Supplemental Register. Generic terms cannot be marks. This is why agencies push clients away from "Pizza Hut" territory and toward "Pentium" territory.
 
-**b) The Nice Classification.** Administered by WIPO under the 1957 Nice Agreement. Currently 45 classes (1–34 goods, 35–45 services), reissued annually; the Thirteenth Edition (NCL 13-2026) took effect January 1, 2026. Identical marks can co-exist in different classes (e.g., "Delta" exists for airlines, faucets, and dental insurance). Choosing the right class is the most consequential filing decision: protection extends only to the classes specified.
+**b) The Nice Classification.** Administered by WIPO under the 1957 Nice Agreement. Currently 45 classes (1–34 goods, 35–45 services), reissued annually; the Thirteenth Edition (NCL 13-2026) took effect January 1, 2026. Identical marks can co-exist for unrelated goods (e.g., "Delta" exists for airlines, faucets, and dental insurance). Classes organize filings; they do not wall off conflicts. Likelihood of confusion turns on whether goods, services, and trade channels are related, which can cross classes — so a knockout search must cover related classes, not only the one you file in.
 
-**c) Trademark search.** The USPTO retired the legacy TESS system in late 2023; current search is at tmsearch.uspto.gov with Boolean Search Builder and field tagging. Other essential databases: WIPO Global Brand Database, EUIPO eSearch Plus, Canadian CIPO, UK IPO. Practitioners run *knockout* searches first (exact + phonetic equivalents in target classes) and then full clearance searches (covering common-law, social handles, business directories, and domain registrations) on shortlisted finalists. Costs: ~$350–$850/class for direct USPTO filing; ~$1,500–$5,000+ for full attorney clearance on a single mark.
+**c) Trademark search.** The USPTO retired the legacy TESS system in late 2023; current search is at tmsearch.uspto.gov with Boolean Search Builder and field tagging. Other essential databases: WIPO Global Brand Database, EUIPO eSearch Plus, Canadian CIPO, UK IPO. Practitioners run *knockout* searches first (exact + phonetic equivalents across target and related classes) and then full clearance searches (covering common-law, social handles, business directories, and domain registrations) on shortlisted finalists. Costs: ~$350–$850/class for direct USPTO filing; ~$1,500–$5,000+ for full attorney clearance on a single mark.
 
-**d) Common law vs. registered marks.** In the U.S., trademark rights arise from *use in commerce*, not registration — but registration brings major advantages (nationwide constructive notice, presumption of validity, statutory damages, customs recordation, basis for foreign filing). The ® symbol may only be used on registered marks; ™ is freely usable to assert common-law rights.
+**d) Common law vs. registered marks.** In the U.S., trademark rights arise from *use in commerce*, not registration — but registration brings major advantages (nationwide constructive notice, presumption of validity, customs recordation, basis for foreign filing). The ® symbol may only be used on registered marks; ™ is freely usable to assert common-law rights.
 
 **e) International protection.** The **Madrid Protocol** (administered by WIPO) allowed brand owners as of December 31, 2025 to designate up to 132 countries through 116 member parties from a single national "basic mark," per WIPO's official Madrid Yearly Review 2026 — together those members "collectively represent 68% of all countries worldwide, 82% of the global population and roughly 90% of global GDP." It is cost-efficient but tied to the basic application for 5 years; if the basic mark falls, all designations can be "central-attacked." Non-Madrid jurisdictions require direct national filings. Per the USPTO Data Visualization Center and the Sterne Kessler Goldstein & Fox February 2025 year-in-review, inbound Madrid (§66(a)) designations now represent under 20% of U.S. trademark applications across roughly 765,000 FY2024 filings — on the order of 60,000+ Madrid applications annually, not a marginal flow.
 
@@ -180,10 +158,10 @@ The legal punchline: **suggestive, arbitrary, and fanciful marks can be register
 - **Apple** — Steve Jobs named it after visiting an apple farm (and after working at an orchard); chose it for its "fun-spirited and non-intimidating" feel, and to come alphabetically before Atari. Apple Inc. dropped "Computer" in 2007.
 - **Google** — originally **BackRub** (1996), renamed in 1997 as a misspelling of *googol* (10¹⁰⁰); the founders registered google.com after a colleague misspelled the math term.
 - **Sony** — from Latin *sonus* (sound) + "sonny" (US slang for a bright young man); chosen by Akio Morita and Masaru Ibuka to replace the cumbersome *Tokyo Tsushin Kogyo* and to read identically in every Roman-alphabet market.
-- **Pepsi** — coined by Caleb Bradham in 1898 (originally "Brad's Drink"); named for *pepsin*, an enzyme in the original formula and a digestive aid.
+- **Pepsi** — coined by Caleb Bradham in 1898 (originally "Brad's Drink"); the name played on *dyspepsia* and the drink's billing as a digestive aid. Pepsin was never an ingredient.
 - **Coca-Cola** — coined by John Pemberton's bookkeeper Frank Robinson in 1886 from the two original ingredients (coca leaves + kola nuts); the alliteration was Robinson's deliberate choice.
 - **BlackBerry** — named by Lexicon (David Placek's team) for Research In Motion. The strawberry/blackberry insight came from a butcher-paper brainstorm; chosen because executives wanted a name that wouldn't "stress or elevate blood pressure" but feel "like a summer vacation, a long walk, or fresh fruit." RIM executives initially thought Placek was "crazy"; the company officially adopted BlackBerry as the corporate name in 2013.
-- **Pentium** — Lexicon, 1992–93, for Intel. *Penta-* (five, for the 586 generation) + scientific *-ium* suffix evoking titanium/sodium. Replaced "586" specifically because numbers could not be trademarked.
+- **Pentium** — Lexicon, 1992–93, for Intel. *Penta-* (five, for the 586 generation) + scientific *-ium* suffix evoking titanium/sodium. Replaced "586" because a court had held Intel's "386" to be a generic part number that rivals could use, so Intel wanted a name it could own.
 - **Häagen-Dazs** — invented by Reuben and Rose Mattus in the Bronx in 1961. The name is meaningless — chosen to *sound* Danish (with an umlaut Danish doesn't actually use) to suggest Old-World, premium craftsmanship.
 - **Starbucks** — from Starbuck, the first mate of the *Pequod* in *Moby-Dick*; chosen by founders Gordon Bowker, Jerry Baldwin, and Zev Siegl in 1971 for its nautical/coffee-trading resonance.
 - **IKEA** — Ingvar Kamprad + Elmtaryd (his family farm) + Agunnaryd (his hometown).
@@ -192,73 +170,27 @@ The legal punchline: **suggestive, arbitrary, and fanciful marks can be register
 - **Twitter** — launched as *twttr* in 2006 because twitter.com was taken; bought the vowels later. The name is mimetic: short bursts of bird-like chatter.
 - **Lyft** — deliberate misspelling of "lift," chosen to be unique, brandable, and emotionally warm (vs. Uber's harder German/Latin tone).
 - **Amazon** — Jeff Bezos chose it (1995) over original "Cadabra" partly so the company would appear at the top of alphabetical lists, partly to evoke vastness.
-- **Yahoo!** — recursive acronym ("Yet Another Hierarchical Officious Oracle"); originally "Jerry and David's Guide to the World Wide Web." Exclamation mark added because *Yahoo* was already trademarked.
+- **Yahoo!** — acronym ("Yet Another Hierarchical Officious Oracle"), also a nod to the Yahoos of *Gulliver's Travels*; originally "Jerry and David's Guide to the World Wide Web." The exclamation mark is often said to have dodged an existing *Yahoo* mark — treat that as anecdote; punctuation alone generally does not avoid a conflict.
 
 **b) Naming failures and controversies.**
 - **Tronc** — Tribune Co.'s 2016 rebrand, widely mocked; reverted to Tribune Publishing within two years.
 - **Qwikster** — Netflix's failed 2011 split-brand for DVD-by-mail; abandoned within weeks.
 - **Altria** — Philip Morris's 2003 rebrand; failed to dilute the cigarette association (later spun off Kraft).
 - **Voltswagen** — VW's 2021 April Fool's stunt mishandled as a real announcement.
-- **Mondēlez** — Kraft's 2012 snack-foods spinoff; widely critiqued as nonsensical.
+- **Mondelēz** — Kraft's 2012 snack-foods spinoff; widely critiqued as nonsensical.
 - **Consignia** — UK Royal Mail's 2001 rebrand; abandoned within 15 months.
-- **Edsel** — Ford's 1958 car; cited in academic literature (Wallace 1975; Klink 2001) as a sound-symbolism failure (back vowels and harsh "ds" cluster were wrong for an aspirational sedan).
+- **Edsel** — Ford's 1958 car, named for Henry Ford's son after a famously long search; often cited as a naming failure, though the car failed for many reasons.
 
 **c) Major rebranding case studies.**
 - **Accenture (from Andersen Consulting, 2001).** Anthony Shore at Landor led the project in 80 days after an arbitration ruling forced the name change; the winning name was originally suggested by an Accenture employee (from "accent on the future"). Shore's own retrospective account (Fortune, October 26, 2025, "The 25th-anniversary story of Accenture's name") describes the rigour: "I was asked to compile every language spoken across Andersen Consulting's 47 countries. In the end, 65 languages were tested, three native speakers for each, to ensure no unintended meanings slipped through. To this day, I don't think any naming project in history has been vetted so thoroughly." Reported cost: ~$100 million. Timing was extraordinarily lucky — Arthur Andersen collapsed in the Enron scandal months later.
 - **Alphabet (Google parent, 2015).** Sundar Pichai/Larry Page's restructuring vehicle. Critique: "Alphabet" reads as elementary; the holding-company brand has never accumulated independent equity.
-- **Meta (Facebook, 2021).** Critique: prefix "meta-" carries negative resonances (metastasis, metabolism); chose to align with the *metaverse* concept (term coined by Neal Stephenson, *Snow Crash*, 1992 — not William Gibson).
+- **Meta (Facebook, 2021).** Critique: prefix "meta-" carries negative resonances (metastasis); chose to align with the *metaverse* concept (term coined by Neal Stephenson, *Snow Crash*, 1992 — not William Gibson).
 - **RH (from Restoration Hardware), KFC (from Kentucky Fried Chicken), WW (from Weight Watchers), Dunkin' (from Dunkin' Donuts).** A common pattern: long, descriptive, era-specific names compress to initials or short forms when the parent wants to broaden its category.
 - **Abrdn (from Standard Life Aberdeen, 2021).** The pure-vowel-deletion experiment; widely mocked but pronounced "Aberdeen." A cautionary tale about deference to digital aesthetics over speakability.
 
 ---
 
-### 7. Naming Agencies and Their Philosophies
-
-**Lexicon Branding (Sausalito, est. 1982; David Placek).** ~18 full-time staff plus ~100 linguists in ~75 countries. Names include Pentium, BlackBerry, PowerBook, Swiffer, Febreze, Dasani, OnStar, Scion, Sonos, Azure, Impossible Burger, Vercel, Windsurf, Lucid. Distinctive belief: *sound symbolism* is a primary lever; *invented* names beat *suggestive/descriptive* names in the long run because "humans are more interested in the new."
-
-**Lippincott (New York, est. 1943).** Coined the term "corporate identity." Acquired by Marsh & McLennan in 1986, now part of Oliver Wyman Group. Best known for M&A and rebrand work — Visa Inc. (2005), Bombardier, Samsung, Coca-Cola, Delta, Starbucks. Methodology emphasizes screening discipline.
-
-**Interbrand (London, NY, est. 1974).** Publishers of the *Best Global Brands* annual ranking; verbal-identity practice is a sub-discipline within a full-service brand consultancy. Past clients: Microsoft, Toyota, AT&T.
-
-**Landor (San Francisco, est. 1941).** Behind FedEx, BP, Hyatt, and (with Anthony Shore) Accenture. Now part of WPP. Famously the agency Walter Landor ran from a converted ferryboat on the SF waterfront.
-
-**Siegel+Gale (NY, est. 1969).** Publishers of the *Simplicity Index*. Worked on Adobe, Caterpillar, AARP. Managing director Jason Cieslak's stated belief: "no company or product will rise and fall on its name alone. But a compelling name will often help a company break through the clutter."
-
-**Igor International (Sausalito → San Francisco, est. 2002; Steve Manning & Jay Jurisich).** Names include Aria (Las Vegas), Gogo Inflight, TruTV, Boogie Board, Cutthroat Kitchen. Philosophy: "almost militant embrace" of real and natural-sounding words; opposes the invented-name and focus-group industries; published the free *Building the Perfect Beast: The Igor Naming Guide*. Jurisich later founded Zinzin (2011).
-
-**A Hundred Monkeys (Berkeley, est. 1990; Danny Altman, now Eli Altman).** Roughly 75 cumulative years of naming experience across a team of six; 700+ projects. Names include Miro (rebrand from RealTimeBoard) and Abridge. Outspoken opposition to "Frankenstein linguistics" (the dropped-vowel and faux-Latin trends); preference for "provocative and human" real-word names.
-
-**Catchword (Oakland/Tenafly, est. 1998; Maria Cypher & Mark Skoultchi).** Clients include Starbucks, Unilever, Fitbit, Nike, Walgreens, McDonald's, Bic. Stated philosophy: "more is more" — generate hundreds to thousands of candidates per project.
-
-**Operative Words (San Francisco, est. 2009; Anthony Shore).** Solo-led linguist agency. 250+ named companies/products including Yum! Brands, Dreyer's Slow Churned, Tonal, Virgin Voyages, FedEx Custom Critical, Adobe Lightroom, Qualcomm Snapdragon, Fitbit Ionic.
-
-**Zinzin (Berkeley, 2011; Jay Jurisich).** Igor co-founder's later studio. Positioning emphasizes "provocative" name strategy.
-
-**Eat My Words (San Francisco; Alexandra Watkins).** Author of *Hello, My Name Is Awesome*. Publishes the SMILE (Suggestive, Memorable, Imagery, Legs, Emotional) / SCRATCH (avoid Spelling-challenged, Copycat, Random, Annoying, Tame, Curse-of-knowledge, Hard-to-pronounce) framework.
-
-**Brighter Naming (Athol Foden), River + Wolf, NameBase, Pollywog, Tanj, OVO.** Other notable boutiques.
-
----
-
-### 8. Books and Theoretical Foundations
-
-- **Marty Neumeier — *The Brand Gap* (2003) and *Zag* (2006).** Source of the seven-criteria checklist and the "Onlyness" formula. Less academic, more practitioner-pithy.
-- **Alina Wheeler — *Designing Brand Identity* (Wiley, 1st ed. 2003; 6th ed. 2024 with Rob Meyerson).** The most widely adopted text in branding curricula; the "five-phase methodology" of brand-identity development. Wheeler died in 2024; the 6th edition continued in collaboration with Meyerson (a former HP head of brand architecture and naming).
-- **Rob Meyerson — *Brand Naming: The Complete Guide to Creating a Name for Your Company, Product, or Service* (2023).** The most recent practitioner textbook devoted entirely to naming.
-- **Alex Frankel — *Wordcraft: The Art of Turning Little Words into Big Business* (2004).** Long-form journalism following the creation of five names — BlackBerry, Accenture, Viagra, Porsche Cayenne, and IBM's "e-business." The richest non-academic account of how Lexicon, Landor, and Interbrand actually work.
-- **Steve Rivkin & Fraser Sutherland — *The Making of a Name* (Oxford UP, 2004).** Practical taxonomy and methodology from a senior practitioner (Rivkin) plus a lexicographer (Sutherland).
-- **Eli Altman — *Don't Call It That: A Naming Workbook* (2021).** Workbook-style guide from A Hundred Monkeys.
-- **Alexandra Watkins — *Hello, My Name Is Awesome: How to Create Brand Names That Stick* (2014, Berrett-Koehler).**
-- **Anthony Shore, Henri Charmasson, John Murphy, Wally Olins.** Other notable practitioner authors.
-
-Academic foundations:
-- Keller, Heckler & Houston (1998), "The Effects of Brand Name Suggestiveness on Advertising Recall," *Journal of Marketing.*
-- Yorkston & Menon (2004); Klink (2000, 2001, 2003); Lowrey & Shrum (2007); Shrum et al. (2012); Sidhu & Pexman (2018); Pathak et al. (2019); Motoki et al. (2022); Ćwiek et al. (2022).
-- Daniel Kahneman's *Thinking, Fast and Slow* (2011) is relevant indirectly: brand names operate primarily in System 1 (fast, intuitive, affective). Kahneman's research on cognitive ease — Alter & Oppenheimer (2006) showed that fluently-pronounceable stock tickers outperformed unpronounceable ones in early trading — directly supports the practitioner instinct for pronounceability.
-
----
-
-### 9. Modern Trends in Naming
+### 7. Modern Trends in Naming
 
 **a) Dropped vowels.** Flickr, Tumblr, Grindr, Scribd, Mndfl, Sqrrl, Pixlr, Blendr, Cazoo, MSTRKRFT, Abrdn. Origin: domain availability in the early-2000s Web 2.0 wave. Status circa 2024–25: declining. Crunchbase's seed-funding analysis (2022, 2023) finds a return to real-word names — "the crazy, silly, weird spelling name trend seems to have waned a lot" (Athol Foden, Brighter Naming).
 
@@ -274,9 +206,9 @@ Academic foundations:
 
 ---
 
-### 10. Naming for Global Markets — China Specifically
+### 8. Naming for Global Markets — China Specifically
 
-Naming for China is a separate discipline. Mandarin is logographic and tonal: every brand name must be rendered in characters, and every character carries semantic and tonal weight. There are four standard strategies, articulated by Jolin Guan (Executive Strategy Director, Superunion Shanghai):
+Naming for China is a separate discipline. Chinese writing is logographic and Mandarin is tonal: every brand name must be rendered in characters, and every character carries semantic and tonal weight. There are four standard strategies, articulated by Jolin Guan (Executive Strategy Director, Superunion Shanghai):
 
 1. **Literation (phonetic).** A character-string chosen for sound similarity. *Adidas* → 阿迪达斯 *Ādídásī*; *McDonald's* → 麦当劳 *Màidāngláo*. Easy to remember; weak at brand-building because the characters are nearly empty of relevant meaning.
 2. **Translation (semantic).** Direct meaning-based rendering. *Apple* → 苹果 *Píngguǒ*; *Mercedes-Benz* → 奔驰 *Bēnchí* ("galloping fast/dashing speed").
@@ -286,17 +218,17 @@ Naming for China is a separate discipline. Mandarin is logographic and tonal: ev
 Per Vladimir Djurovic (CEO, Labbrand): "It is nearly impossible to stumble on the optimal Chinese brand name out of mere team brainstorming, since most name creations will face either a legal risk or a linguistic issue in some important dialect. In most naming projects, the final name is chosen out of several hundred possible candidates."
 
 Famous failures and recoveries:
-- **Best Buy** entered as 百思买 *Bǎisīmǎi* (intended as "Best + buy"), but the phrase reads as "think a hundred times before you buy"; closed all nine stores after five years.
+- **Best Buy** entered as 百思买 *Bǎisīmǎi* (intended as "Best + buy"), which can read as "think a hundred times before you buy"; it closed its nine branded stores after five years, for business reasons beyond the name.
 - **Mercedes-Benz** initially tried 奔斯 *Bēnsī*, often heard as 奔死 *Bēnsǐ* ("rush to die"); recovered with 奔驰 *Bēnchí*.
-- **Coca-Cola** in pre-WWII China was rendered by individual local merchants with characters such as 蝌蚪啃蜡 (*Kēdǒu kěn là*, "bite the wax tadpole") or 骒马口蠟 ("mare stuffed with wax"); the company chose 可口可乐 before relaunching, and chairman Roberto Goizueta called the April 15, 1981 Chinese re-entry "one of the most important days in the history of our company."
+- **Coca-Cola** — *legend, poorly sourced:* local merchants in 1920s China are said to have rendered it as 蝌蚪啃蜡 ("bite the wax tadpole"). *Documented:* the company adopted 可口可乐 in the 1920s–30s and returned to mainland China in 1979.
 - **Castel (French wine)** lost a trademark battle with a local producer over 卡斯特 *Kǎsītè* in 2013; fined $5 million and forced to rebrand to 卡思黛乐.
 - **TripAdvisor** moved from 到到 *Dào-dào* ("arrive arrive") — too phonetically remote — to 猫途鹰 *Māo-tú-yīng* (a play on "owl" replacing the "head" character with "journey").
 
-Fan (1997) showed empirically that Chinese-preferred brand names use two-syllable compounds with high-pitched tonic structure (H-H: 47%; L-H: 25%), modifier-noun grammar, and positive connotations. These are quantitative design constraints, not aesthetic preferences.
+Fan (1997) is one study of one sample (see §3g); treat its patterns as preferences and get market-specific linguistic review for any real Chinese name.
 
 ---
 
-### 11. The Full Professional Naming Process
+### 9. The Full Professional Naming Process
 
 A composite of practices across Lexicon, Igor, Lippincott, Catchword, A Hundred Monkeys, and Operative Words:
 
@@ -305,7 +237,7 @@ A composite of practices across Lexicon, Igor, Lippincott, Catchword, A Hundred 
 3. **Ideation (Weeks 2–3).** Multiple parallel teams; deliberate misdirection of some; sound-symbolic guides; morpheme tables; thesauruses, etymology, foreign-language sources, AI generators. Target: 500–2,000 candidates.
 4. **Internal triage to ~50–150 candidates.** Eliminate phonetic disasters, near-duplicates, obvious trademark conflicts.
 5. **Linguistic screening (Weeks 4–5).** Native-speaker linguists in target markets check for pronunciation, unintended meanings, slurs, false cognates, taboo associations. For global names, this means 15–75 languages (Accenture was tested in 65 languages with three native speakers per language).
-6. **Knockout trademark search.** Eliminate candidates with obvious dead-stop conflicts in target Nice classes (USPTO Trademark Search, WIPO Global Brand Database, EUIPO, target-country registers).
+6. **Knockout trademark search.** Eliminate candidates with obvious dead-stop conflicts in target and related Nice classes (USPTO Trademark Search, WIPO Global Brand Database, EUIPO, target-country registers).
 7. **Shortlist to ~10–20 candidates.** Now begin domain and social-handle availability checks; secondary common-law searches.
 8. **Consumer testing (Week 5–6, if budget permits).** Aided/unaided recall; affective rating; product-fit testing. Caution: Placek explicitly warns against survey-driven selection — *the right name is polarizing, so it will lose surveys.*
 9. **Full clearance (Weeks 6–7).** Attorney-led searches on 3–5 finalists; common-law, foreign jurisdictions, related industries.
@@ -316,46 +248,12 @@ Total elapsed time: 6–12 weeks. Total candidates considered: 500–2,000. Tota
 
 ---
 
-## Recommendations
-
-**If you are choosing a name for a new venture:**
-
-1. **Start with the Abercrombie spectrum, not the dictionary.** Aim for suggestive, arbitrary, or fanciful. Avoid descriptive at all costs unless you have the marketing budget to build secondary meaning from scratch (and even then, you will eventually rebrand — see KFC, RH, WW).
-2. **Generate at the right scale.** A serious naming exercise produces 500–2,000 candidates, not 20. The first 50 are obvious; the breakthrough name is almost always in the second thousand.
-3. **Apply Neumeier's seven criteria as a filter, not a generator.** Distinctive, brief, appropriate, easy to spell and pronounce, likable, extendable, protectable.
-4. **Engineer the sound, not just the meaning.** Use Yorkston-Menon, Klink, and Lowrey-Shrum: front vowels and fricatives for small/light/fast/elegant products; back vowels and stops for large/heavy/powerful/serious products. Test the bouba/kiki feel of the wordmark visually.
-5. **Resist the comfort heuristic.** If your team unanimously loves a name on first hearing, it is probably a category-typical name. Polarizing reactions are the diagnostic of a strong name.
-6. **Clear before you commit.** Run knockout USPTO/WIPO searches on the top 20; full clearance on the top 3–5. Cleared trademark + reasonable domain (exact .com or strong .co/.ai with prefix) is non-negotiable for serious ventures.
-7. **For global brands, design the Chinese name in parallel, not as an afterthought.** Engage a specialist (Labbrand, Superunion, Sandpiper) for any brand entering Greater China. Aim for a phonosemantic ("dual") name that works at the character, tonal, and dialectal levels.
-
-**Decision thresholds — when to change a current name:**
-
-- Your name now describes only ~30% or less of your business (Restoration Hardware → RH; Kentucky Fried Chicken → KFC; Apple Computer → Apple).
-- Your name has acquired a serious negative association (Tronc, Edsel, Andersen post-Enron).
-- You are entering markets where the current name is illegal, unpronounceable, or carries a culturally unacceptable meaning (Mercedes 奔斯/奔死 → 奔驰).
-- You are merging or spinning off and need to establish a clean post-transaction identity (Accenture, Altria, Verizon).
-
-**Thresholds against rebranding:**
-
-- The name has 5+ years of compounding equity in the target market.
-- The pain is reputational, not strategic — fix the reputation instead.
-- The proposed new name is *no more distinctive* than the current one (Tronc is the cautionary case).
-
-**Tools to use right now:**
-
-- USPTO trademark search at tmsearch.uspto.gov; WIPO Global Brand Database; EUIPO eSearch Plus.
-- Crossword dictionary (Placek's specific recommendation) to check unwanted hidden meanings.
-- Native-speaker linguistic checks in target markets via Lionbridge, TransPerfect, or specialized agencies for every shortlist candidate.
-- Generative AI for *quantity expansion* of an ideation set; never for selection.
-
----
-
 ## Caveats
 
-- **Sound-symbolism research is robust but probabilistic.** Effect sizes in Yorkston-Menon, Klink, and Lowrey-Shrum are real (typically 60:40 to 70:30 in preference tests) but not deterministic. A name violating sound-symbolic conventions can still succeed if other elements compensate (Apple is a back-vowel name in a fast/light product category; it succeeded).
+- **Sound-symbolism research is robust but probabilistic.** Effect sizes in Yorkston-Menon, Klink, and Lowrey-Shrum are real (typically 60:40 to 70:30 in preference tests) but not deterministic. A name violating sound-symbolic conventions can still succeed if other elements compensate (Apple, a front-vowel name, sells premium and fairly heavy hardware and succeeded; Lowrey & Shrum's effects shift with the product category).
 - **The Abercrombie spectrum is a U.S. legal framework.** Other jurisdictions use related but distinct doctrines (UK passing-off; EU Community Trade Mark; Chinese first-to-file). Scholars including Rebecca Tushnet and S. Adarsh have argued that the Abercrombie spectrum "lacks empirical foundation" and is out of step with consumer psychology — it works as a *legal* tool, but is an imperfect proxy for marketing distinctiveness.
 - **Bouba/kiki numbers are widely misquoted.** The famous "95%" figure comes from Ramachandran & Hubbard's (2001) Tamil/American college-student samples specifically. The most rigorous cross-cultural test — Ćwiek et al. (2022, *Phil. Trans. R. Soc. B* 377:20200390), spanning 25 languages — reported a posterior mean of 72% (95% credible interval: 56–82%), with the effect failing to replicate in Chinese, Romanian, and Turkish samples. Treat the effect as real but smaller and more language-dependent than popular accounts suggest.
-- **Many famous naming "facts" are folklore.** The KFC "eat your fingers off" Chinese mistranslation, the Pepsi "ancestors back from the grave" slogan, the Chevy Nova "no va" failure, and various Coca-Cola "wax tadpole" myths are repeated endlessly but rarely sourced to a primary 1980s–90s Chinese advertisement. I have flagged these in the text as legends rather than confirmed history.
+- **Many famous naming "facts" are folklore.** The KFC "eat your fingers off" Chinese mistranslation, the Pepsi "ancestors back from the grave" slogan, the Chevy Nova "no va" failure, and various Coca-Cola "wax tadpole" myths are repeated endlessly but rarely sourced to a primary 1980s–90s Chinese advertisement. Section 8 labels them as legend where they appear.
 - **Generative-AI naming tools change quickly.** The specific tools named (Namelix, Squadhelp, etc.) are accurate as of mid-2026 but the field is evolving rapidly; LLM-prompted custom workflows are displacing turnkey products at the high end.
 - **Agency pricing is opaque.** Public figures range from ~$10,000 (smaller boutiques, simple briefs) to ~$150,000 (Lexicon-level corporate work) to $100M+ for full M&A rebrands like Accenture. Treat any quoted number as illustrative.
 - **The "1,000–1,500 candidates" figure is Lexicon's standard, not a universal one.** Boutique agencies (A Hundred Monkeys, Eat My Words) often achieve breakthrough names from 100–300 candidates by tighter brief-writing upfront.
