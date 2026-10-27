@@ -3,24 +3,26 @@
   name skill — naming triage interface template.
   HOW TO USE (agent):
     1. Replace BRIEF and CANDIDATES below. Leave everything else alone.
-    2. Set each candidate's `rec: true` for your recommended shortlist (they start starred).
+       Write values as plain JSON-style literals. Never put a raw "</" in a string; write "<\/".
+    2. Set `rec: true` for the recommended shortlist (they start starred) and `rank: 1..5` for the top picks.
     3. Theme it per the /html skill — retheme the :root tokens to fit the *subject*
        (a finance tool ≠ a kids' app). Keep the layout and JS; restyle freely.
-    4. Run the 6-point check at the bottom of SKILL.md before handoff.
-  The structure, filters, single-Set state, and clipboard logic are done. Don't rebuild them.
+       Keep text at 4.5:1 contrast or better in both themes.
+    4. Run the "Before handoff — verify" list in SKILL.md.
+  The structure, filters, single-Set state, persistence, and clipboard logic are done. Don't rebuild them.
 -->
 <html lang="en" data-theme="dark">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Names · {{PROJECT}}</title>
+<title>Names</title>
 <style>
   /* ---- THEME TOKENS — retheme these per /html to fit the subject ---- */
   :root {
     --bg: #0f1115; --surface: #171a21; --surface-2: #1d212a; --border: #2a2f3a;
-    --text: #e6e9ef; --muted: #9aa3b2; --faint: #6b7280;
+    --text: #e6e9ef; --muted: #a9b1bf; --faint: #8f98a8;
     --accent: #7c9cff; --accent-soft: #7c9cff22; --star: #ffc857;
-    --flag: #ff6b6b; --flag-soft: #ff6b6b1a;
+    --flag: #ff8585; --flag-soft: #ff6b6b1a; --ok: #6fd3a0;
     --radius: 10px; --space-1: 4px; --space-2: 8px; --space-3: 12px;
     --space-4: 16px; --space-5: 24px; --space-6: 32px;
     --font: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
@@ -29,7 +31,8 @@
   }
   [data-theme="light"] {
     --bg: #f6f7f9; --surface: #fff; --surface-2: #f0f2f5; --border: #dfe3ea;
-    --text: #1a1d24; --muted: #5a6472; --faint: #98a1b0; --accent-soft: #7c9cff1f;
+    --text: #1a1d24; --muted: #4f5866; --faint: #5f6876; --accent: #3557d6; --accent-soft: #3557d61f;
+    --flag: #b42318; --flag-soft: #b423180f; --ok: #1f7a4d; --star: #b7791f;
   }
   * { box-sizing: border-box; }
   body {
@@ -38,6 +41,7 @@
     -webkit-font-smoothing: antialiased;
   }
   a { color: var(--accent); }
+  button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
   .wrap { max-width: 1240px; margin: 0 auto; padding: var(--space-5); }
 
   /* HEADER — outside the grid */
@@ -46,23 +50,27 @@
   header.page .brief { color: var(--muted); flex: 1 1 320px; min-width: 0; }
   header.page .mode { font-family: var(--mono); font-size: 12px; color: var(--faint); text-transform: uppercase; letter-spacing: 0.04em; }
   .theme-toggle { background: var(--surface-2); border: 1px solid var(--border); color: var(--muted); border-radius: var(--radius); padding: var(--space-1) var(--space-3); cursor: pointer; font-size: 12px; }
+  .errors { background: var(--flag-soft); border: 1px solid var(--flag); color: var(--flag); border-radius: var(--radius); padding: var(--space-3) var(--space-4); margin-bottom: var(--space-5); font-size: 13px; }
+  .errors ul { margin: var(--space-1) 0 0; padding-left: var(--space-5); }
 
-  /* GRID — main + sticky rail */
+  /* GRID — main + sticky rail; on narrow screens the rail drops below the results */
   .layout { display: grid; grid-template-columns: 1fr var(--rail-w); gap: var(--space-5); align-items: start; }
-  @media (max-width: 960px) { .layout { grid-template-columns: 1fr; } .rail { display: none; } }
+  @media (max-width: 960px) { .layout { grid-template-columns: 1fr; } .rail { position: static; } }
 
   section.block { margin-bottom: var(--space-6); }
   h2.lbl { font-size: 12px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--faint); margin: 0 0 var(--space-3); }
+  .empty-msg { color: var(--faint); font-size: 13px; }
 
   /* 1 — COVERAGE BAR */
   .coverage { display: flex; flex-direction: column; gap: var(--space-2); }
-  .cov-row { display: grid; grid-template-columns: 130px 1fr 34px; align-items: center; gap: var(--space-3); cursor: pointer; background: none; border: 0; color: inherit; font: inherit; text-align: left; padding: 0; }
+  .cov-row { display: grid; grid-template-columns: 150px 1fr 34px; align-items: center; gap: var(--space-3); cursor: pointer; background: none; border: 0; color: inherit; font: inherit; text-align: left; padding: 0; }
   .cov-row .nm { color: var(--muted); font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .cov-row .track { background: var(--surface-2); border-radius: 6px; height: 14px; overflow: hidden; }
-  .cov-row .fill { background: var(--accent); height: 100%; border-radius: 6px; }
+  .cov-row .track { display: block; background: var(--surface-2); border-radius: 6px; height: 14px; overflow: hidden; }
+  .cov-row .fill { display: block; background: var(--accent); height: 100%; border-radius: 6px; }
   .cov-row .ct { font-family: var(--mono); font-size: 12px; color: var(--faint); text-align: right; }
+  .cov-row.zero .nm, .cov-row.zero .ct { color: var(--flag); }
   .cov-row[aria-pressed="true"] .nm { color: var(--text); font-weight: 600; }
-  .cov-row.dim { opacity: 0.35; }
+  .cov-row.dim { opacity: 0.45; }
 
   /* 2 — FILTERS */
   .filters { display: flex; flex-direction: column; gap: var(--space-2); }
@@ -72,15 +80,19 @@
   .chip-btn[aria-pressed="true"] { background: var(--accent-soft); border-color: var(--accent); color: var(--text); }
   .clear-btn { background: none; border: 0; color: var(--accent); cursor: pointer; font-size: 12px; padding: var(--space-1) var(--space-2); }
 
-  /* 3 — RECOMMENDED CARDS */
+  /* 3 — CARDS (top picks + recommended) */
   .type-group { margin-bottom: var(--space-4); }
   .type-group > .type-lbl { font-size: 11px; color: var(--faint); text-transform: uppercase; letter-spacing: 0.05em; margin: 0 0 var(--space-2); }
   .cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: var(--space-3); }
   .card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: var(--space-3) var(--space-4); position: relative; }
-  .card .nm { font-size: 16px; font-weight: 650; letter-spacing: -0.01em; overflow-wrap: anywhere; }
+  .card.top { border-color: var(--accent); }
+  .card .rank { font-family: var(--mono); font-size: 11px; color: var(--accent); }
+  .card .nm { font-size: 16px; font-weight: 650; letter-spacing: -0.01em; overflow-wrap: anywhere; padding-right: var(--space-5); }
   .card .why { color: var(--muted); margin: var(--space-1) 0 var(--space-2); }
   .card .meta { display: flex; flex-wrap: wrap; gap: var(--space-1) var(--space-3); font-size: 11px; color: var(--faint); font-family: var(--mono); }
-  .card .flag { display: block; margin-top: var(--space-2); font-size: 11px; color: var(--flag); background: var(--flag-soft); border-radius: 6px; padding: var(--space-1) var(--space-2); }
+  .card .flag { display: block; margin-top: var(--space-2); font-size: 12px; color: var(--flag); background: var(--flag-soft); border-radius: 6px; padding: var(--space-1) var(--space-2); }
+  .card .check { display: block; margin-top: var(--space-2); font-size: 11px; color: var(--ok); }
+  .card .check.none { color: var(--faint); font-style: italic; }
   .star { position: absolute; top: var(--space-2); right: var(--space-2); background: none; border: 0; cursor: pointer; font-size: 16px; line-height: 1; color: var(--faint); padding: var(--space-1); }
   .star[aria-pressed="true"] { color: var(--star); }
 
@@ -89,6 +101,7 @@
   .pchip { display: inline-flex; align-items: center; gap: var(--space-2); background: var(--surface); border: 1px solid var(--border); border-radius: 999px; padding: var(--space-1) var(--space-2) var(--space-1) var(--space-3); font-size: 12px; max-width: 100%; }
   .pchip .pnm { font-weight: 600; overflow-wrap: anywhere; }
   .pchip .pgl { color: var(--faint); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 160px; }
+  .pchip .pflag { color: var(--flag); cursor: help; }
   .pchip .star { position: static; font-size: 13px; }
   .hidden { display: none !important; }
 
@@ -98,15 +111,18 @@
   .rail .count { font-family: var(--mono); font-size: 12px; color: var(--muted); margin-bottom: var(--space-3); }
   .rail .picks { display: flex; flex-direction: column; gap: var(--space-1); max-height: 52vh; overflow: auto; margin-bottom: var(--space-3); }
   .rail .pick { display: flex; justify-content: space-between; gap: var(--space-2); font-size: 13px; padding: var(--space-1) 0; }
+  .rail .pick .pflag { color: var(--flag); margin-left: var(--space-1); }
   .rail .pick .ptype { color: var(--faint); font-size: 11px; font-family: var(--mono); }
   .rail .actions { display: flex; gap: var(--space-2); }
   .rail .actions button { flex: 1; border-radius: var(--radius); padding: var(--space-2); cursor: pointer; font-size: 12px; border: 1px solid var(--border); }
   .rail .reset { background: var(--surface-2); color: var(--muted); }
   .rail .copy { background: var(--accent); color: #0b0d12; border-color: var(--accent); font-weight: 600; }
+  [data-theme="light"] .rail .copy, [data-theme="light"] .pill { color: #fff; }
   .rail .copy:disabled { opacity: 0.4; cursor: not-allowed; }
   .rail .empty { color: var(--faint); font-size: 12px; }
+  .rail textarea { width: 100%; min-height: 160px; margin-top: var(--space-3); background: var(--surface-2); color: var(--text); border: 1px solid var(--border); border-radius: 6px; font-family: var(--mono); font-size: 11px; }
 
-  /* floating pill (mobile) */
+  /* floating pill (narrow screens) — jumps to the rail below the results */
   .pill { display: none; position: fixed; bottom: var(--space-4); right: var(--space-4); background: var(--accent); color: #0b0d12; border: 0; border-radius: 999px; padding: var(--space-3) var(--space-5); font-weight: 600; cursor: pointer; box-shadow: 0 6px 24px #0006; z-index: 20; }
   @media (max-width: 960px) { .pill { display: block; } }
 
@@ -115,6 +131,7 @@
 
   .toast { position: fixed; bottom: var(--space-5); left: 50%; transform: translateX(-50%); background: var(--surface-2); border: 1px solid var(--border); color: var(--text); border-radius: var(--radius); padding: var(--space-2) var(--space-4); font-size: 13px; opacity: 0; transition: opacity 0.2s; pointer-events: none; z-index: 30; }
   .toast.show { opacity: 1; }
+  .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 </style>
 </head>
 <body>
@@ -123,8 +140,10 @@
     <h1 id="title">Names</h1>
     <div class="brief" id="brief"></div>
     <span class="mode" id="mode"></span>
-    <button class="theme-toggle" onclick="document.documentElement.dataset.theme = document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark'">theme</button>
+    <button class="theme-toggle" id="themeBtn">theme</button>
   </header>
+
+  <div class="errors hidden" id="errors" role="alert"></div>
 
   <div class="layout">
     <main>
@@ -138,8 +157,13 @@
         <div class="filters">
           <div class="filter-row" id="typeFilters"><span class="cap">Type</span></div>
           <div class="filter-row" id="metaFilters"><span class="cap">Theme</span></div>
-          <div class="filter-row"><button class="clear-btn" id="clearBtn">Clear filters</button></div>
+          <div class="filter-row"><button class="clear-btn" id="clearBtn">Clear filters</button><span class="empty-msg" id="matchCount"></span></div>
         </div>
+      </section>
+
+      <section class="block" id="topBlock">
+        <h2 class="lbl">Top picks</h2>
+        <div class="cards" id="top"></div>
       </section>
 
       <section class="block">
@@ -153,182 +177,269 @@
       </section>
     </main>
 
-    <aside class="rail">
+    <aside class="rail" id="rail">
       <h2>Shortlist</h2>
-      <div class="count" id="railCount">0 of 0</div>
+      <div class="count" id="railCount" aria-live="polite">0 starred of 0</div>
       <div class="picks" id="railPicks"></div>
       <div class="actions">
         <button class="reset" id="resetBtn">Reset</button>
         <button class="copy" id="copyBtn">Copy</button>
       </div>
+      <textarea id="copyFallback" class="hidden" readonly aria-label="Shortlist markdown — select and copy"></textarea>
     </aside>
   </div>
 
   <footer class="page">
-    <span id="footPath"></span> · Star to curate · <strong>Copy</strong> exports the shortlist as markdown.
+    <code id="footPath"></code> · Star to curate (stars are saved in this browser) · <strong>Copy</strong> exports the shortlist as markdown.
   </footer>
 </div>
 
 <button class="pill" id="pill">Shortlist (0)</button>
-<div class="toast" id="toast"></div>
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
 
 <script>
 /* ============================================================
    INJECT YOUR DATA HERE — replace BRIEF and CANDIDATES only.
    Candidate shape:
-     { id, name, type, metaphor, gloss, sound, syllables, tier, flag, rec }
-   - type:      taxonomy type label (groups cards + coverage bar)
+     { id, name, type, metaphor, gloss, sound, syllables, tier, score, rank, flag, check, rec }
+   - id:        unique number or string
+   - type:      one label from TYPES below (groups cards + coverage bar)
    - metaphor:  theme/angle from the brief (drives the Theme filter); "" if none
    - gloss:     short meaning/why (one line)
    - sound:     sound read, e.g. "velvet-soft, calm"
    - syllables: number
-   - tier:      Abercrombie tier ("Arbitrary", "Fanciful", …)
-   - flag:      risk string or "" — shown as a warning chip
+   - tier:      Abercrombie tier ("Arbitrary", "Fanciful", …), provisional
+   - score:     1–5 fit to the brief (rubric in SKILL.md Step 4)
+   - rank:      1–5 for the top picks, else null
+   - flag:      risk string or "" — shown as a warning
+   - check:     what was searched and found, e.g. "web + USPTO, 2026-10-27: no live mark in software"; "" = unchecked
    - rec:       true => in the recommended set => starts starred + shown as a card
    ============================================================ */
 const BRIEF = {
   project: "{{PROJECT}}",
   line: "{{ONE-LINE BRIEF}}",
-  mode: "deep",            // "deep" | "quick"  (quick: rec-only, no pool tier)
+  mode: "deep",            // "deep" | "quick"  (quick: every candidate is rec, no pool tier)
   path: "{{ABSOLUTE PATH}}"
 };
 const CANDIDATES = [
   // EXAMPLE ROWS — delete and replace.
-  { id: 1, name: "Vellum", type: "Lexical/arbitrary", metaphor: "tactile/premium", gloss: "Old translucent drawing surface — tactile, premium.", sound: "velvet-soft, calm", syllables: 2, tier: "Arbitrary", flag: "A Sketch font is named Vellum — check the TM class.", rec: true },
-  { id: 2, name: "Slate", type: "Lexical/arbitrary", metaphor: "tactile/premium", gloss: "Clean surface to start on.", sound: "flat, grounded", syllables: 1, tier: "Arbitrary", flag: "", rec: true },
-  { id: 3, name: "Inkwell", type: "Compound", metaphor: "writing", gloss: "Source of ink — where words come from.", sound: "soft open, warm", syllables: 2, tier: "Suggestive", flag: "", rec: false },
+  { id: 1, name: "Vellum", type: "Lexical", metaphor: "tactile/premium", gloss: "Old translucent drawing surface — tactile, premium.", sound: "velvet-soft, calm", syllables: 2, tier: "Arbitrary", score: 4, rank: 1, flag: "A Sketch font is named Vellum — check related software classes.", check: "", rec: true },
+  { id: 2, name: "Slate", type: "Lexical", metaphor: "tactile/premium", gloss: "Clean surface to start on.", sound: "flat, grounded", syllables: 1, tier: "Arbitrary", score: 3, rank: null, flag: "", check: "", rec: true },
+  { id: 3, name: "Inkwell", type: "Compound", metaphor: "writing", gloss: "Source of ink — where words come from.", sound: "soft open, warm", syllables: 2, tier: "Suggestive", score: 3, rank: null, flag: "", check: "", rec: false },
 ];
 /* ============================================================
    Below this line is the engine — do not rebuild it per run.
    ============================================================ */
 
+// The taxonomy from SKILL.md Step 2. Deep mode shows every type, so a zero count is visible.
+const TYPES = ["Descriptive", "Suggestive", "Associative", "Synonym-driven", "Invented", "Abstract",
+  "Compound", "Portmanteau", "Acronym", "Lexical", "Foreign", "Palindrome", "Reduplicative",
+  "Mimetic", "Altered spelling", "Affixed"];
+
 const $ = (s, r = document) => r.querySelector(s);
+function el(tag, cls, text) {
+  const n = document.createElement(tag);
+  if (cls) n.className = cls;
+  if (text != null) n.textContent = String(text);
+  return n;
+}
 const byType = (arr) => {
   const m = new Map();
   for (const c of arr) { if (!m.has(c.type)) m.set(c.type, []); m.get(c.type).push(c); }
   return [...m.entries()];
 };
+const isQuick = BRIEF.mode === "quick";
 
-// SINGLE SOURCE OF TRUTH: one Set of starred ids.
+// VALIDATE — bad data shows a banner instead of a quietly wrong page.
+function validate() {
+  const errs = [];
+  const seen = new Set();
+  const required = ["id", "name", "type", "gloss", "tier"];
+  CANDIDATES.forEach((c, i) => {
+    required.forEach(k => { if (c[k] == null || c[k] === "") errs.push(`#${i + 1} (${c.name || "?"}) is missing "${k}".`); });
+    // 1 and "1" would share a focus key and a saved-star slot, so compare ids as strings.
+    if (seen.has(String(c.id))) errs.push(`Duplicate id ${JSON.stringify(c.id)} (${c.name}).`);
+    seen.add(String(c.id));
+    if (typeof c.rec !== "boolean") errs.push(`${c.name}: "rec" must be true or false.`);
+    if (!TYPES.includes(c.type)) errs.push(`${c.name}: type "${c.type}" is not in TYPES.`);
+    if (isQuick && !c.rec) errs.push(`${c.name}: quick mode shows no pool, so every candidate needs rec: true.`);
+    if (c.rank != null && !c.rec) errs.push(`${c.name}: a ranked top pick must also be rec: true.`);
+  });
+  const norm = s => String(s).normalize("NFKD").toLowerCase().replace(/[^\p{L}\p{N}]/gu, "");
+  const names = new Map();
+  CANDIDATES.forEach(c => { const k = norm(c.name); if (names.has(k)) errs.push(`Duplicate name: ${names.get(k)} / ${c.name}.`); else names.set(k, c.name); });
+  return errs;
+}
+const ERRORS = validate();
+
+// SINGLE SOURCE OF TRUTH: one Set of starred ids, saved per artifact.
+const STORE_KEY = "name-skill:" + BRIEF.path + ":" + BRIEF.project;
 const DEFAULT_STARRED = CANDIDATES.filter(c => c.rec).map(c => c.id);
-const starred = new Set(DEFAULT_STARRED);
+const starred = new Set(loadStars());
 const activeTypes = new Set();
 const activeMetas = new Set();
+function loadStars() {
+  try {
+    const raw = localStorage.getItem(STORE_KEY);
+    if (raw) { const ids = new Set(CANDIDATES.map(c => c.id)); return JSON.parse(raw).filter(id => ids.has(id)); }
+  } catch (e) { /* storage blocked — fall back to defaults */ }
+  return DEFAULT_STARRED;
+}
+function saveStars() {
+  try { localStorage.setItem(STORE_KEY, JSON.stringify([...starred])); } catch (e) { /* storage blocked */ }
+}
 
-const recs = CANDIDATES.filter(c => c.rec);
+const tops = CANDIDATES.filter(c => c.rec && c.rank != null).sort((a, b) => a.rank - b.rank);
+const recs = CANDIDATES.filter(c => c.rec && c.rank == null);
 const pool = CANDIDATES.filter(c => !c.rec);
-const allTypes = [...new Set(CANDIDATES.map(c => c.type))];
 const allMetas = [...new Set(CANDIDATES.map(c => c.metaphor).filter(Boolean))];
-const isQuick = BRIEF.mode === "quick";
+const coverageTypes = isQuick ? [...new Set(CANDIDATES.map(c => c.type))] : [...TYPES, ...new Set(CANDIDATES.map(c => c.type).filter(t => !TYPES.includes(t)))];
 
 function matches(c) {
   const t = activeTypes.size === 0 || activeTypes.has(c.type);
   const m = activeMetas.size === 0 || activeMetas.has(c.metaphor);
   return t && m;
 }
+const toggle = (set, v) => set.has(v) ? set.delete(v) : set.add(v);
 
 function buildStatic() {
   $("#title").textContent = "Names · " + BRIEF.project;
   document.title = "Names · " + BRIEF.project;
   $("#brief").textContent = BRIEF.line;
   $("#mode").textContent = BRIEF.mode + " mode";
-  $("#footPath").innerHTML = "<code>" + BRIEF.path + "</code>";
+  $("#footPath").textContent = BRIEF.path;
   if (isQuick) $("#poolBlock").classList.add("hidden");
+  if (ERRORS.length) {
+    const box = $("#errors");
+    box.append(el("strong", null, `Data errors (${ERRORS.length}) — fix CANDIDATES:`));
+    const ul = el("ul"); ERRORS.forEach(e => ul.append(el("li", null, e))); box.append(ul);
+    box.classList.remove("hidden");
+  }
 
-  // type filter buttons
   const tf = $("#typeFilters");
-  allTypes.forEach(t => {
-    const b = document.createElement("button");
-    b.className = "chip-btn"; b.textContent = t; b.setAttribute("aria-pressed", "false");
+  [...new Set(CANDIDATES.map(c => c.type))].forEach(t => {
+    const b = el("button", "chip-btn", t); b.setAttribute("aria-pressed", "false");
+    b.dataset.key = "type:" + t;
     b.onclick = () => { toggle(activeTypes, t); render(); };
-    b.dataset.type = t; tf.appendChild(b);
+    b.dataset.type = t; tf.append(b);
   });
-  // metaphor filter buttons
   const mf = $("#metaFilters");
   if (allMetas.length === 0) mf.classList.add("hidden");
   allMetas.forEach(m => {
-    const b = document.createElement("button");
-    b.className = "chip-btn"; b.textContent = m; b.setAttribute("aria-pressed", "false");
+    const b = el("button", "chip-btn", m); b.setAttribute("aria-pressed", "false");
+    b.dataset.key = "meta:" + m;
     b.onclick = () => { toggle(activeMetas, m); render(); };
-    b.dataset.meta = m; mf.appendChild(b);
+    b.dataset.meta = m; mf.append(b);
   });
 }
-const toggle = (set, v) => set.has(v) ? set.delete(v) : set.add(v);
 
 function starButton(c) {
-  const b = document.createElement("button");
-  b.className = "star"; b.setAttribute("aria-pressed", starred.has(c.id));
-  b.setAttribute("aria-label", "Star " + c.name); b.textContent = starred.has(c.id) ? "★" : "☆";
-  b.onclick = (e) => { e.stopPropagation(); toggle(starred, c.id); render(); };
+  const on = starred.has(c.id);
+  const b = el("button", "star", on ? "★" : "☆");
+  b.setAttribute("aria-pressed", on);
+  b.setAttribute("aria-label", (on ? "Unstar " : "Star ") + c.name);
+  b.dataset.key = "star:" + c.id;
+  b.onclick = (e) => { e.stopPropagation(); toggle(starred, c.id); saveStars(); render(); };
   return b;
 }
 
+function card(c) {
+  const n = el("div", "card" + (c.rank != null ? " top" : ""));
+  if (c.rank != null) n.append(el("div", "rank", "#" + c.rank));
+  n.append(el("div", "nm", c.name), el("div", "why", c.gloss));
+  const meta = el("div", "meta");
+  if (c.score != null) meta.append(el("span", null, "fit " + c.score + "/5"));
+  [c.type, c.sound, c.syllables != null ? c.syllables + " syl" : "", c.tier].filter(Boolean).forEach(t => meta.append(el("span", null, t)));
+  n.append(meta);
+  if (c.flag) n.append(el("span", "flag", "⚠ " + c.flag));
+  n.append(c.check ? el("span", "check", "✓ " + c.check) : el("span", "check none", "not searched yet"));
+  n.append(starButton(c));
+  return n;
+}
+
 function render() {
+  // Remember focus by key so re-rendering does not drop keyboard users.
+  const focusKey = document.activeElement && document.activeElement.dataset ? document.activeElement.dataset.key : null;
+  $("#copyFallback").classList.add("hidden"); // a shown fallback would go stale once stars change
+
   const counts = {};
+  coverageTypes.forEach(t => counts[t] = 0);
   CANDIDATES.forEach(c => counts[c.type] = (counts[c.type] || 0) + 1);
-  const maxCt = Math.max(...Object.values(counts));
+  const maxCt = Math.max(1, ...Object.values(counts));
 
   // 1 — coverage bar
-  const cov = $("#coverage"); cov.innerHTML = "";
+  const cov = $("#coverage"); cov.replaceChildren();
   Object.entries(counts).sort((a, b) => b[1] - a[1]).forEach(([type, ct]) => {
     const on = activeTypes.has(type);
-    const row = document.createElement("button");
-    row.className = "cov-row" + (activeTypes.size && !on ? " dim" : "");
+    const row = el("button", "cov-row" + (activeTypes.size && !on ? " dim" : "") + (ct === 0 ? " zero" : ""));
     row.setAttribute("aria-pressed", on);
-    row.innerHTML = `<span class="nm">${type}</span><span class="track"><span class="fill" style="width:${(ct / maxCt * 100).toFixed(1)}%"></span></span><span class="ct">${ct}</span>`;
-    row.onclick = () => { toggle(activeTypes, type); render(); };
-    cov.appendChild(row);
+    row.setAttribute("aria-label", `${type}: ${ct} candidates`);
+    row.dataset.key = "cov:" + type;
+    const fill = el("span", "fill"); fill.style.width = (ct / maxCt * 100).toFixed(1) + "%";
+    const track = el("span", "track"); track.append(fill);
+    row.append(el("span", "nm", type), track, el("span", "ct", ct));
+    if (ct > 0) row.onclick = () => { toggle(activeTypes, type); render(); };
+    else row.disabled = true;
+    cov.append(row);
   });
 
-  // sync filter button states
   document.querySelectorAll("#typeFilters .chip-btn").forEach(b => b.setAttribute("aria-pressed", activeTypes.has(b.dataset.type)));
   document.querySelectorAll("#metaFilters .chip-btn").forEach(b => b.setAttribute("aria-pressed", activeMetas.has(b.dataset.meta)));
 
-  // 3 — recommended cards, grouped by type
-  const rc = $("#recommended"); rc.innerHTML = "";
-  byType(recs.filter(matches)).forEach(([type, list]) => {
-    const g = document.createElement("div"); g.className = "type-group";
-    g.innerHTML = `<p class="type-lbl">${type}</p>`;
-    const grid = document.createElement("div"); grid.className = "cards";
-    list.forEach(c => {
-      const card = document.createElement("div"); card.className = "card";
-      card.innerHTML = `<div class="nm">${c.name}</div><div class="why">${c.gloss}</div>` +
-        `<div class="meta"><span>${c.sound}</span><span>${c.syllables} syl</span><span>${c.tier}</span></div>` +
-        (c.flag ? `<span class="flag">⚠ ${c.flag}</span>` : "");
-      card.appendChild(starButton(c));
-      grid.appendChild(card);
-    });
-    g.appendChild(grid); rc.appendChild(g);
+  // 3a — top picks
+  const tp = $("#top"); tp.replaceChildren();
+  const topShown = tops.filter(matches);
+  topShown.forEach(c => tp.append(card(c)));
+  $("#topBlock").classList.toggle("hidden", tops.length === 0);
+
+  // 3b — recommended cards, grouped by type
+  const rc = $("#recommended"); rc.replaceChildren();
+  const recShown = recs.filter(matches);
+  byType(recShown).forEach(([type, list]) => {
+    const g = el("div", "type-group");
+    g.append(el("p", "type-lbl", type));
+    const grid = el("div", "cards");
+    list.forEach(c => grid.append(card(c)));
+    g.append(grid); rc.append(g);
   });
 
   // 4 — pool chips (deep only)
+  let poolShown = [];
   if (!isQuick) {
-    const pl = $("#pool"); pl.innerHTML = "";
-    byType(pool.filter(matches)).forEach(([type, list]) => {
-      list.forEach(c => {
-        const chip = document.createElement("span"); chip.className = "pchip";
-        chip.innerHTML = `<span class="pnm">${c.name}</span>` + (c.gloss ? `<span class="pgl">${c.gloss}</span>` : "");
-        chip.appendChild(starButton(c));
-        pl.appendChild(chip);
-      });
-    });
+    const pl = $("#pool"); pl.replaceChildren();
+    poolShown = pool.filter(matches);
+    byType(poolShown).forEach(([, list]) => list.forEach(c => {
+      const chip = el("span", "pchip");
+      chip.title = [c.type, c.tier, c.sound].filter(Boolean).join(" · ");
+      chip.append(el("span", "pnm", c.name));
+      if (c.gloss) chip.append(el("span", "pgl", c.gloss));
+      if (c.flag) { const f = el("span", "pflag", "⚠"); f.title = c.flag; f.setAttribute("aria-label", "Risk: " + c.flag); chip.append(f); }
+      chip.append(starButton(c));
+      pl.append(chip);
+    }));
   }
+
+  const shown = topShown.length + recShown.length + poolShown.length;
+  const filtering = activeTypes.size || activeMetas.size;
+  $("#matchCount").textContent = filtering ? (shown ? `${shown} matching` : "0 matching candidates — clear a filter") : "";
+  document.body.dataset.rendered = document.querySelectorAll(".card, .pchip").length;
 
   // rail / shortlist
   const picked = CANDIDATES.filter(c => starred.has(c.id));
-  $("#railCount").textContent = `${picked.length} of ${CANDIDATES.length}`;
-  const rp = $("#railPicks");
-  if (picked.length === 0) rp.innerHTML = `<div class="empty">Nothing starred yet.</div>`;
-  else {
-    rp.innerHTML = "";
-    picked.forEach(c => {
-      const row = document.createElement("div"); row.className = "pick";
-      row.innerHTML = `<span>${c.name}</span><span class="ptype">${c.type}</span>`;
-      rp.appendChild(row);
-    });
-  }
+  $("#railCount").textContent = `${picked.length} starred of ${CANDIDATES.length}`;
+  const rp = $("#railPicks"); rp.replaceChildren();
+  if (picked.length === 0) rp.append(el("div", "empty", "Nothing starred yet."));
+  picked.forEach(c => {
+    const row = el("div", "pick");
+    const left = el("span", null, c.name);
+    if (c.flag) { const f = el("span", "pflag", "⚠"); f.title = c.flag; f.setAttribute("aria-label", "Risk: " + c.flag); left.append(f); }
+    row.append(left, el("span", "ptype", c.type));
+    rp.append(row);
+  });
   $("#copyBtn").disabled = picked.length === 0;
   $("#pill").textContent = `Shortlist (${picked.length})`;
+
+  if (focusKey) { const t = document.querySelector(`[data-key="${CSS.escape(focusKey)}"]`); if (t) t.focus(); }
 }
 
 function shortlistMarkdown() {
@@ -336,29 +447,44 @@ function shortlistMarkdown() {
   let md = `# ${BRIEF.project} — shortlist\n\n_${BRIEF.line}_\n\n`;
   byType(picked).forEach(([type, list]) => {
     md += `## ${type}\n`;
-    list.forEach(c => { md += `- **${c.name}** — ${c.gloss} (${c.sound}, ${c.syllables} syl, ${c.tier})${c.flag ? ` ⚠ ${c.flag}` : ""}\n`; });
+    list.forEach(c => {
+      md += `- **${c.name}** — ${c.gloss} (${[c.sound, c.syllables != null ? c.syllables + " syl" : "", c.tier, c.score != null ? "fit " + c.score + "/5" : ""].filter(Boolean).join(", ")})`;
+      md += c.flag ? ` ⚠ ${c.flag}` : "";
+      md += c.check ? ` — checked: ${c.check}` : " — not searched yet";
+      md += "\n";
+    });
     md += "\n";
   });
   return md;
 }
 
-function toast(msg) {
+let toastTimer;
+function toast(msg, ms = 1800) {
   const t = $("#toast"); t.textContent = msg; t.classList.add("show");
-  setTimeout(() => t.classList.remove("show"), 1800);
+  clearTimeout(toastTimer); toastTimer = setTimeout(() => t.classList.remove("show"), ms);
+}
+function showFallback(md) {
+  const ta = $("#copyFallback"); ta.value = md; ta.classList.remove("hidden"); ta.focus(); ta.select();
+  toast("Clipboard blocked — the markdown is selected in the shortlist panel. Press Cmd/Ctrl+C.", 6000);
 }
 
 // wire actions
+$("#themeBtn").onclick = () => { const d = document.documentElement; d.dataset.theme = d.dataset.theme === "dark" ? "light" : "dark"; };
 $("#clearBtn").onclick = () => { activeTypes.clear(); activeMetas.clear(); render(); };
-$("#resetBtn").onclick = () => { starred.clear(); DEFAULT_STARRED.forEach(id => starred.add(id)); render(); };
+$("#resetBtn").onclick = () => { starred.clear(); DEFAULT_STARRED.forEach(id => starred.add(id)); saveStars(); render(); toast("Stars reset to the recommended set"); };
 $("#copyBtn").onclick = () => {
-  navigator.clipboard.writeText(shortlistMarkdown())
-    .then(() => toast("Shortlist copied"))
-    .catch(() => toast("Copy failed — select the page text manually"));
+  const md = shortlistMarkdown();
+  try {
+    if (!navigator.clipboard || !navigator.clipboard.writeText) throw new Error("no clipboard API");
+    navigator.clipboard.writeText(md).then(() => toast("Shortlist copied"), () => showFallback(md));
+  } catch (e) { showFallback(md); }
 };
-$("#pill").onclick = () => $(".rail").scrollIntoView({ behavior: "smooth" });
+$("#pill").onclick = () => { $("#rail").scrollIntoView({ behavior: "smooth" }); $("#copyBtn").focus({ preventScroll: true }); };
 
 buildStatic();
 render();
+document.body.dataset.total = CANDIDATES.length;
+document.body.dataset.errors = ERRORS.length;
 </script>
 </body>
 </html>
