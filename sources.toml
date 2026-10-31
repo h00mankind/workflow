@@ -18,7 +18,7 @@
 repository = "https://github.com/mattpocock/skills"
 path = "skills"
 skills = ["teach", "handoff", "writing-for-agents"]
-commit = "24fe0ef7737efae15c87225755e9f6f5965e4888"
+commit = "a496f5513d4a4cf889bc48e189e579f4b0bdf6aa"
 
 # My port of pstack. The fetch reads the local clone, so a commit there is
 # enough. It is a complete plugin: skills, agents, and hooks.
@@ -26,7 +26,7 @@ commit = "24fe0ef7737efae15c87225755e9f6f5965e4888"
 repository = "/Users/h0_0man/Documents/h00man.code/pstack-claude"
 path = "plugins/pstack"
 plugin = true
-commit = "4d1abeab6e77baf92905f031da803133fe95eb05"
+commit = "1b059e8b213f1e230bafc0b0ddfbcebe20df288e"
 
 # Damir Sokolovsky's UI unslop skill (CC BY 4.0). Named after the author,
 # because h00man and pstack already have a writing skill named unslop.
