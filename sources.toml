@@ -33,3 +33,9 @@ commit = "1b059e8b213f1e230bafc0b0ddfbcebe20df288e"
 [heydamir]
 repository = "https://github.com/heydamir/unslop"
 commit = "4652254daff586ff4739849395a127b56f7f8cc7"
+
+# Theo Browne's tstack: PR shipping skills (full-send, council, babysit-pr).
+# Some use T3 Code's delegate_task and fall back to native tools.
+[tstack]
+repository = "https://github.com/t3dotgg/tstack"
+commit = "1085050f3baed1ac724caa4a8166145fb2ac88af"

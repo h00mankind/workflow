@@ -15,7 +15,7 @@
 # scope and is enabled for each project.
 [global]
 claude = ["pstack"]
-plugins = ["h00man/name"]
+plugins = ["h00man/name", "tstack"]
 
 [project."~/Documents/h00man.code/workflow"]
 plugins = ["h00man", "matt"]
