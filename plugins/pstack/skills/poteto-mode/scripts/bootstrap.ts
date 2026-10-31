@@ -60,11 +60,12 @@ export function ensureDependenciesInstalled(): void {
 
   writeFileSync(installKeyPath, `${installKey}\n`);
 
-  // Bun resolved this process's imports before node_modules existed, and it does
-  // not look again, so a dynamic import of commander would still fail. Rerun the
-  // same command in a fresh process that sees the installed packages.
-  const rerun = Bun.spawnSync([process.execPath, ...process.argv.slice(1)], {
-    stdio: ["inherit", "inherit", "inherit"],
+  const restarted = Bun.spawnSync([process.execPath, ...process.argv.slice(1)], {
+    cwd: process.cwd(),
+    env: process.env,
+    stdin: "inherit",
+    stdout: "inherit",
+    stderr: "inherit",
   });
-  process.exit(rerun.exitCode ?? 1);
+  process.exit(restarted.exitCode ?? 1);
 }

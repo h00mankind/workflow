@@ -5,21 +5,19 @@ import { fileURLToPath } from "node:url";
 import { type Static, Type } from "typebox";
 import { Value } from "typebox/value";
 
-const EFFORT_LEVELS = ["low", "medium", "high", "xhigh", "max"] as const;
-type Effort = (typeof EFFORT_LEVELS)[number];
 const PARENT_MODEL_ALIASES = ["inherit-parent", "auto"];
 
 // A parent passes it to each agent it starts, so the agent knows its depth.
 export const DEPTH_FLAG = "pstack-depth";
+// Under agentDir, holds each session's agent sessions and prompts. The worktree
+// audit scans it by this name, so a rename must reach that script too.
+export const PSTACK_STATE_DIR = "pstack";
 
 export interface Settings {
   pluginRoot: string;
   modelsFile: string;
   agentDir: string;
   pi: { command: string; args: string[] };
-  // Unset, so an agent inherits the session's environment. Tests set it to
-  // configure their fake pi.
-  childEnv?: NodeJS.ProcessEnv;
   // Layers below the main session: 0 there, 1 in its agents, and so on.
   readonly depth: number;
   killGraceMs: number;
@@ -59,11 +57,14 @@ export function defaultSettings(readDepth: () => number, env: NodeJS.ProcessEnv 
 interface Sheet {
   text: string;
   hookOff: boolean;
+  // Leaves ask_user_question to another extension: Pi refuses to start when two
+  // extensions register the same tool name.
+  askToolOff: boolean;
   piModels: Map<string, string>;
 }
 
 export function parseSheet(text: string): Sheet {
-  const lines = text.split(/\r?\n/);
+  const lines = text.replace(/^\uFEFF/, "").split(/\r?\n/);
   const piModels = new Map<string, string>();
   for (const line of lines) {
     const m = /^pi models:\s*(.*)$/.exec(line.trim());
@@ -73,23 +74,44 @@ export function parseSheet(text: string): Sheet {
       if (alias && id) piModels.set(alias, id);
     }
   }
-  return { text, hookOff: lines.some((l) => l === "session hook: off"), piModels };
+  return {
+    text,
+    hookOff: lines.some((l) => l === "session hook: off"),
+    askToolOff: lines.some((l) => l === "pi ask tool: off"),
+    piModels,
+  };
 }
 
 export function readSheet(agentDir: string): Sheet | undefined {
-  const file = join(agentDir, "pstack-models.md");
-  return existsSync(file) ? parseSheet(readFileSync(file, "utf8")) : undefined;
+  let bytes: Buffer;
+  try {
+    bytes = readFileSync(join(agentDir, "pstack-models.md"));
+  } catch {
+    // An absent or unreadable sheet leaves the defaults in place, as the session hooks do.
+    return undefined;
+  }
+  // Windows PowerShell 5.1's `>` writes UTF-16 LE with a byte-order mark. A
+  // sheet that is not valid UTF-16 LE counts as absent, as in the session hooks.
+  if (bytes[0] !== 0xff || bytes[1] !== 0xfe) return parseSheet(bytes.toString("utf8"));
+  try {
+    // ignoreBOM keeps the byte-order mark, so parseSheet drops exactly one, as for
+    // UTF-8. A Node built without ICU throws here, and the sheet counts as absent.
+    return parseSheet(new TextDecoder("utf-16le", { fatal: true, ignoreBOM: true }).decode(bytes));
+  } catch {
+    return undefined;
+  }
 }
 
 // The parts of models.json the extension reads; the generator checks the rest.
 const modelsConfig = Type.Object({
   available: Type.Array(Type.String()),
+  efforts: Type.Array(Type.String()),
   pi: Type.Object({ fallback: Type.String(), models: Type.Record(Type.String(), Type.Record(Type.String(), Type.String())) }),
 });
 
 function readModels(modelsFile: string): Static<typeof modelsConfig> {
   const raw: unknown = JSON.parse(readFileSync(modelsFile, "utf8"));
-  if (!Value.Check(modelsConfig, raw)) throw new Error(`${modelsFile} is not a pstack models file: it needs available[] and pi.{fallback, models}.`);
+  if (!Value.Check(modelsConfig, raw)) throw new Error(`${modelsFile} is not a pstack models file: it needs available[], efforts[] and pi.{fallback, models}.`);
   return raw;
 }
 
@@ -124,7 +146,6 @@ export const GENERAL_PURPOSE = "general-purpose";
 interface AgentDefinition {
   body: string;
   model?: string;
-  effort?: Effort;
 }
 
 export function frontmatter(text: string): { fields: Map<string, string>; body: string } {
@@ -137,26 +158,27 @@ export function frontmatter(text: string): { fields: Map<string, string>; body: 
   return { fields, body: (m?.[2] ?? text).trim() };
 }
 
-function parseAgentFile(type: string, text: string): AgentDefinition {
+function parseAgentFile(text: string): AgentDefinition {
   const { fields, body } = frontmatter(text);
-  const named = fields.get("effort");
-  const effort = EFFORT_LEVELS.find((level) => level === named);
-  if (named !== undefined && !effort) {
-    throw new Error(`${type}: effort "${named}" is not one of ${EFFORT_LEVELS.join(", ")}`);
-  }
-  return { body, model: fields.get("model") || undefined, effort };
+  return { body, model: fields.get("model") || undefined };
+}
+
+// The agent tool's effort parameter: one of models.json's levels.
+export function checkEffort(effort: string, settings: Pick<Settings, "modelsFile">): string {
+  const { efforts } = readModels(settings.modelsFile);
+  if (!efforts.includes(effort)) throw new Error(`effort "${effort}" is not one of ${efforts.join(", ")}`);
+  return effort;
 }
 
 // Claude Code registers each plugin agent file as pstack:<file name>, beside
 // the built-in general-purpose type, which has no agent file.
-export function loadAgentTypes(pluginRoot: string): Map<string, AgentDefinition> {
+export function loadAgentTypes(settings: Pick<Settings, "pluginRoot">): Map<string, AgentDefinition> {
   const types = new Map<string, AgentDefinition>([[GENERAL_PURPOSE, { body: "" }]]);
-  for (const dir of ["agents", "effort-agents"]) {
-    const full = join(pluginRoot, dir);
-    if (!existsSync(full)) continue;
-    for (const file of readdirSync(full).filter((f) => f.endsWith(".md")).sort()) {
+  const dir = join(settings.pluginRoot, "agents");
+  if (existsSync(dir)) {
+    for (const file of readdirSync(dir).filter((f) => f.endsWith(".md")).sort()) {
       const type = `pstack:${basename(file, ".md")}`;
-      types.set(type, parseAgentFile(type, readFileSync(join(full, file), "utf8")));
+      types.set(type, parseAgentFile(readFileSync(join(dir, file), "utf8")));
     }
   }
   return types;

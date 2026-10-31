@@ -15,6 +15,7 @@
 # scope and is enabled for each project.
 [global]
 claude = ["pstack"]
+plugins = ["h00man/name", "tstack"]
 
 [project."~/Documents/h00man.code/workflow"]
 plugins = ["h00man", "matt"]
@@ -32,3 +33,6 @@ codex = ["pstack"]
 plugins = ["h00man/variants", "h00man/unslop", "h00man/frontend", "h00man/eli5", "h00man/caveman"]
 
 [project."~/Documents/h00man.code/okkotsu"]
+
+[project."~/Documents/h00man.code/pressmeifyoucan"]
+plugins = ["heydamir/unslop"]

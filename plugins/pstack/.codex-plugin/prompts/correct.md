@@ -1,6 +1,6 @@
 ---
 name: correct
-description: find the mistakes agents repeat in this repo and make each one impossible, with architecture, types, a lint, or a test before docs
+description: find the mistakes agents keep repeating in a repo and make each one impossible, enforced at the highest level that works
 disable-model-invocation: true
 ---
 

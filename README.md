@@ -9,6 +9,7 @@ plugins/
   h00man/            my own skills, edited here
   matt/              verbatim copy from mattpocock/skills, never edited here
   pstack/            verbatim copy of my pstack port (skills, agents, hooks), never edited here
+  tstack/            verbatim copy from t3dotgg/tstack, never edited here
 agents/              agents that are not in a plugin, by origin
 mcp/                 one definition file per MCP server
 scripts/             statusline, notifications, hooks

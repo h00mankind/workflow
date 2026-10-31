@@ -23,6 +23,8 @@ const assistantEndLine = Type.Object({
 const textPart = Type.Object({ type: Type.Literal("text"), text: Type.String() });
 const failedMessage = Type.Object({ errorMessage: Type.String() });
 const settledLine = Type.Object({ type: Type.Literal("agent_settled") });
+const toolStartLine = Type.Object({ type: Type.Literal("tool_execution_start"), toolCallId: Type.String(), toolName: Type.String(), args: Type.Unknown() });
+const toolEndLine = Type.Object({ type: Type.Literal("tool_execution_end"), toolCallId: Type.String() });
 // Dialogs block the child until the client answers; a notify or status needs none.
 const dialogLine = Type.Object({
   type: Type.Literal("extension_ui_request"),
@@ -38,6 +40,29 @@ export interface ChildExit {
   // "" when the run ended cleanly.
   errorMessage: string;
   stderr: string;
+}
+
+// What a running child is doing, last event wins. It lives only in this
+// process's memory: nothing appends it to the session or sends it as a message,
+// and the model sees it only in a list_agents result.
+export interface Activity {
+  // The tool call in flight, or the last one once it ended.
+  tool?: { name: string; args: string; running: boolean };
+  said?: string;
+  // ISO time of the last activity event.
+  at: string;
+}
+
+const TOOL_ARGS_CAP = 80;
+const SAID_CAP = 120;
+
+const cap = (text: string, max: number) => (text.length > max ? `${text.slice(0, max - 1)}…` : text);
+const oneLine = (text: string) => text.replace(/\s+/g, " ").trim();
+
+function summarizeArgs(args: unknown): string {
+  const fields = typeof args === "object" && args !== null ? (args as Record<string, unknown>) : {};
+  const named = ["command", "pattern", "path", "file_path"].map((key) => fields[key]).find((value) => typeof value === "string");
+  return cap(oneLine(named ?? JSON.stringify(args) ?? ""), TOOL_ARGS_CAP);
 }
 
 function assistantText(content: unknown[]): string {
@@ -59,28 +84,28 @@ export class PiChild {
   readonly exited: Promise<ChildExit>;
   private readonly proc: ChildProcessByStdio<Writable, Readable, Readable>;
   private readonly exitGraceMs: number;
+  private readonly onActivity?: () => void;
   private readonly pending = new Map<string, (response: Answer | undefined) => void>();
   private nextId = 0;
   private open = true;
+  private closeTimer?: NodeJS.Timeout;
   private settled = false;
   private finalText = "";
   private errorMessage = "";
   private stderr = "";
+  private latest?: Activity;
+  // Tool calls from one message can run in parallel; only the end of the call
+  // shown ends it.
+  private toolCallId?: string;
 
-  constructor(command: string, args: string[], opts: { cwd: string; env?: NodeJS.ProcessEnv; exitGraceMs: number }, prompt: string) {
+  constructor(command: string, args: string[], opts: { cwd: string; exitGraceMs: number; onActivity?: () => void }, prompt: string) {
     this.exitGraceMs = opts.exitGraceMs;
-    this.proc = spawn(command, args, { cwd: opts.cwd, env: opts.env, detached: true, stdio: ["pipe", "pipe", "pipe"] });
+    this.onActivity = opts.onActivity;
+    this.proc = spawn(command, args, { cwd: opts.cwd, detached: true, stdio: ["pipe", "pipe", "pipe"] });
     this.pid = this.proc.pid;
     this.proc.stdin.on("error", () => {});
-    const decoder = new StringDecoder("utf8");
-    let buffered = "";
-    const feed = (chunk: string) => {
-      buffered += chunk;
-      const lines = buffered.split("\n");
-      buffered = lines.pop() ?? "";
-      for (const line of lines) this.onLine(line);
-    };
-    this.proc.stdout.on("data", (b: Buffer) => feed(decoder.write(b)));
+    const stdout = lineSplitter((line) => this.onLine(line));
+    this.proc.stdout.on("data", stdout.write);
     this.proc.stderr.on("data", (b: Buffer) => {
       this.stderr = (this.stderr + b.toString("utf8")).slice(-STDERR_CAP);
     });
@@ -91,8 +116,7 @@ export class PiChild {
         if (done) return;
         done = true;
         this.open = false;
-        feed(decoder.end());
-        if (buffered) this.onLine(buffered);
+        stdout.end();
         if (spawnError) this.errorMessage = spawnError.message;
         for (const settle of this.pending.values()) settle(undefined);
         this.pending.clear();
@@ -127,6 +151,15 @@ export class PiChild {
     });
   }
 
+  get activity(): Activity | undefined {
+    return this.latest;
+  }
+
+  private note(change: Pick<Activity, "tool"> | Pick<Activity, "said">): void {
+    this.latest = { ...this.latest, ...change, at: new Date().toISOString() };
+    this.onActivity?.();
+  }
+
   // Resolves with pi's response, or undefined when stdin is closed or the
   // process exits first.
   command(command: RpcCommand): Promise<Answer | undefined> {
@@ -153,22 +186,37 @@ export class PiChild {
   // Pi exits on EOF once idle. One that does not is ended, since nothing else
   // would end the agent.
   close(): void {
-    if (!this.open) return;
-    this.open = false;
-    this.proc.stdin.end();
-    setTimeout(() => this.terminate(this.exitGraceMs), this.exitGraceMs).unref();
+    if (!this.endInput()) return;
+    this.closeTimer = setTimeout(() => this.terminate(this.exitGraceMs), this.exitGraceMs).unref();
   }
 
-  // SIGTERM now, SIGKILL if the child is still there after the grace period.
-  terminate(graceMs: number): void {
-    this.signal("SIGTERM");
-    setTimeout(() => this.signal("SIGKILL"), graceMs).unref();
+  // Ends the run now: stdin closes and one SIGTERM-then-SIGKILL ladder starts,
+  // in place of the one close() would have armed.
+  end(graceMs: number): void {
+    this.endInput();
+    clearTimeout(this.closeTimer);
+    this.terminate(graceMs);
+  }
+
+  private endInput(): boolean {
+    if (!this.open) return false;
+    this.open = false;
+    this.proc.stdin.end();
+    return true;
+  }
+
+  private terminate(graceMs: number): void {
+    if (this.pid) terminateGroup(this.pid, () => this.running, graceMs);
   }
 
   // Signals the child's group only while the child itself is alive: once it
   // has exited the group id may belong to a process this runner never spawned.
   signal(signal: NodeJS.Signals): void {
-    if (this.pid && this.proc.exitCode === null && this.proc.signalCode === null) signalGroup(this.pid, signal);
+    if (this.pid && this.running) signalGroup(this.pid, signal);
+  }
+
+  private get running(): boolean {
+    return this.proc.exitCode === null && this.proc.signalCode === null;
   }
 
   private onLine(line: string): void {
@@ -188,9 +236,18 @@ export class PiChild {
       // the note; a run that ends on one has no answer, only earlier text.
       const { message } = parsed;
       const text = assistantText(message.content);
-      if (text) this.finalText = text;
+      if (text) {
+        this.finalText = text;
+        this.note({ said: cap(oneLine(text.split("\n")[0]), SAID_CAP) });
+      }
       if (Value.Check(failedMessage, message)) this.errorMessage = message.errorMessage;
       else this.errorMessage = text ? "" : `(the last assistant message had no text; stop reason: ${String(message.stopReason)})`;
+    } else if (Value.Check(toolStartLine, parsed)) {
+      this.toolCallId = parsed.toolCallId;
+      this.note({ tool: { name: parsed.toolName, args: summarizeArgs(parsed.args), running: true } });
+    } else if (Value.Check(toolEndLine, parsed)) {
+      const tool = this.latest?.tool;
+      if (tool && parsed.toolCallId === this.toolCallId) this.note({ tool: { ...tool, running: false } });
     } else if (Value.Check(settledLine, parsed)) {
       this.settled = true;
       this.close();
@@ -198,6 +255,26 @@ export class PiChild {
       this.proc.stdin.write(`${JSON.stringify({ type: "extension_ui_response", id: parsed.id, cancelled: true })}\n`);
     }
   }
+}
+
+// Splits pi's stdout into lines on LF only: a Unicode line separator is valid
+// inside a JSON string.
+export function lineSplitter(onLine: (line: string) => void): { write(chunk: Buffer | string): void; end(): void } {
+  const decoder = new StringDecoder("utf8");
+  let buffered = "";
+  const feed = (text: string) => {
+    buffered += text;
+    const lines = buffered.split("\n");
+    buffered = lines.pop() ?? "";
+    for (const line of lines) onLine(line);
+  };
+  return {
+    write: (chunk) => feed(decoder.write(chunk)),
+    end: () => {
+      feed(decoder.end());
+      if (buffered) onLine(buffered);
+    },
+  };
 }
 
 // A process, or with a negative pid its whole group. EPERM means it exists
@@ -215,4 +292,19 @@ export function signalGroup(pid: number, signal: NodeJS.Signals): void {
   try {
     process.kill(-pid, signal);
   } catch {}
+}
+
+// SIGTERM to the group now, SIGKILL if `ours` still holds after the grace
+// period. `ours` guards both signals, since a reused pid is not ours to signal.
+// Resolves when the signal attempt ends, not when the process exits. A restored
+// orphan can retry if either identity check was unavailable during this attempt.
+export function terminateGroup(pid: number, ours: () => boolean, graceMs: number): Promise<void> {
+  if (!ours()) return Promise.resolve();
+  signalGroup(pid, "SIGTERM");
+  return new Promise((resolve) => {
+    setTimeout(() => {
+      if (ours()) signalGroup(pid, "SIGKILL");
+      resolve();
+    }, graceMs).unref();
+  });
 }
