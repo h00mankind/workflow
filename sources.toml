@@ -27,3 +27,9 @@ repository = "/Users/h0_0man/Documents/h00man.code/pstack-claude"
 path = "plugins/pstack"
 plugin = true
 commit = "4d1abeab6e77baf92905f031da803133fe95eb05"
+
+# Damir Sokolovsky's UI unslop skill (CC BY 4.0). Named after the author,
+# because h00man and pstack already have a writing skill named unslop.
+[heydamir]
+repository = "https://github.com/heydamir/unslop"
+commit = "4652254daff586ff4739849395a127b56f7f8cc7"
