@@ -23,7 +23,7 @@ async function browserKit() {
       return createRequire(join(process.cwd(), "package.json"))(name);
     } catch {}
   }
-  console.error("Playwright is not installed. Run `npm i -D playwright` in the project, or `npx playwright install chromium`.");
+  console.error("Playwright is not installed. In your project, run `npm install -D playwright` followed by `npx playwright install chromium`.");
   process.exit(1);
 }
 
@@ -99,6 +99,12 @@ try {
     }
 
     const copy = document.documentElement.cloneNode(true);
+    // Freeze the browser's selected image before removing responsive markup.
+    const images = document.querySelectorAll("img");
+    copy.querySelectorAll("img").forEach((node, index) => {
+      const selected = images[index].currentSrc;
+      if (selected) node.setAttribute("src", selected);
+    });
     copy.querySelectorAll("script, noscript, link[rel='stylesheet'], link[rel='preload'], link[rel='modulepreload'], style").forEach((node) => node.remove());
     copy.querySelectorAll("[srcset]").forEach((node) => node.removeAttribute("srcset"));
     copy.querySelectorAll("source").forEach((node) => node.remove());

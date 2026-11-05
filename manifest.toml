@@ -18,7 +18,7 @@ claude = ["pstack"]
 plugins = ["h00man/name", "tstack"]
 
 [project."~/Documents/h00man.code/workflow"]
-plugins = ["h00man", "matt"]
+plugins = ["h00man", "matt", "agent-desktop", "agent-browser"]
 harnesses = ["claude", "codex", "opencode"]
 
 [project."~/Documents/h00man.code/mcgg"]
@@ -26,7 +26,7 @@ plugins = ["h00man", "matt"]
 harnesses = ["claude", "codex", "opencode"]
 
 [project."~/Documents/h00man.code/labs-by-nexlabs"]
-plugins = ["h00man", "matt"]
+plugins = ["h00man", "matt", "agent-desktop", "agent-browser"]
 codex = ["pstack"]
 
 [project."~/Documents/h00man.code/shuko"]
