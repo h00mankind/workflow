@@ -23,7 +23,7 @@ async function browserKit() {
       return createRequire(join(process.cwd(), "package.json"))(name);
     } catch {}
   }
-  console.error("Playwright is not installed. Run `npm i -D playwright` in the project, or `npx playwright install chromium`.");
+  console.error("Playwright is not installed. In your project, run `npm install -D playwright` followed by `npx playwright install chromium`.");
   process.exit(1);
 }
 
