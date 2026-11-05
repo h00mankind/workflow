@@ -39,3 +39,24 @@ commit = "a6f121eee5f29c2f74976b75456feae8b66afb3a"
 [tstack]
 repository = "https://github.com/t3dotgg/tstack"
 commit = "1085050f3baed1ac724caa4a8166145fb2ac88af"
+
+# Benji Taylor's stageshow (MIT): faux product UI and animated demos,
+# with a React kit, examples, and film scripts. Named after the author.
+[benji]
+repository = "https://github.com/benjitaylor/skills"
+skills = ["stageshow"]
+commit = "802057409787133703c56001080169e347305572"
+
+# Vercel Labs agent-desktop (Apache-2.0): drives desktop apps through the OS
+# accessibility tree. The skill is a stub; the CLI serves the rest.
+[agent-desktop]
+repository = "https://github.com/vercel-labs/agent-desktop"
+skills = ["agent-desktop"]
+commit = "93ae89e86fb849eeb5fc265b0b8e37eca56aaf72"
+
+# Vercel Labs agent-browser (Apache-2.0): browser automation over CDP.
+# The skill is a stub; `agent-browser skills get core` serves the rest.
+[agent-browser]
+repository = "https://github.com/vercel-labs/agent-browser"
+skills = ["agent-browser"]
+commit = "2d1271baefa026161de333a0da55c0f9e118a07f"

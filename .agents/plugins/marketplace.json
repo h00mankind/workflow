@@ -78,6 +78,51 @@
         ]
       },
       "category": "Developer Tools"
+    },
+    {
+      "name": "benji",
+      "source": {
+        "source": "local",
+        "path": "./plugins/benji"
+      },
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_INSTALL",
+        "products": [
+          "CODEX"
+        ]
+      },
+      "category": "Developer Tools"
+    },
+    {
+      "name": "agent-desktop",
+      "source": {
+        "source": "local",
+        "path": "./plugins/agent-desktop"
+      },
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_INSTALL",
+        "products": [
+          "CODEX"
+        ]
+      },
+      "category": "Developer Tools"
+    },
+    {
+      "name": "agent-browser",
+      "source": {
+        "source": "local",
+        "path": "./plugins/agent-browser"
+      },
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_INSTALL",
+        "products": [
+          "CODEX"
+        ]
+      },
+      "category": "Developer Tools"
     }
   ]
 }
